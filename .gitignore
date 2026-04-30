@@ -1,0 +1,46 @@
+# 依赖
+/target/
+**/*.rs.bk
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 编译产物
+*.o
+*.so
+*.dylib
+*.dll
+*.exe
+
+# 测试
+*.profraw
+*.profdata
+coverage/
+
+# 日志
+*.log
+
+# 环境变量
+.env
+.env.local
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# 文档构建
+docs/book/
+docs/html/
+
+# 性能分析
+perf.data*
+flamegraph.svg

@@ -1,0 +1,17 @@
+[package]
+name = "data_core"
+version.workspace = true
+edition.workspace = true
+description = "数据实体定义与加密核心"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+rmp-serde = { workspace = true }
+ring = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }

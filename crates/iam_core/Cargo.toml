@@ -1,0 +1,12 @@
+[package]
+name = "iam_core"
+version.workspace = true
+edition.workspace = true
+description = "iam_core 模块"
+
+[dependencies]
+serde = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+data_core = { path = "../data_core" }

@@ -1,0 +1,12 @@
+[package]
+name = "storage_backends"
+version.workspace = true
+edition.workspace = true
+description = "storage_backends 模块"
+
+[dependencies]
+serde = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+data_core = { path = "../data_core" }

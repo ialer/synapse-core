@@ -1,0 +1,12 @@
+[package]
+name = "messaging_service"
+version.workspace = true
+edition.workspace = true
+description = "messaging_service 模块"
+
+[dependencies]
+serde = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+data_core = { path = "../data_core" }

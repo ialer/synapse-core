@@ -1,0 +1,16 @@
+[package]
+name = "agent_interface"
+version.workspace = true
+edition.workspace = true
+description = "Agent 接口模块 - MCP 协议与 CLI 工具"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+data_core = { path = "../data_core" }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
