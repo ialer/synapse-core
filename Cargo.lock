@@ -218,10 +218,13 @@ name = "iam_core"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "data_core",
  "serde",
+ "serde_json",
  "thiserror",
  "tokio",
+ "uuid",
 ]
 
 [[package]]

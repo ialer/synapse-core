@@ -2,11 +2,14 @@
 name = "iam_core"
 version.workspace = true
 edition.workspace = true
-description = "iam_core 模块"
+description = "身份认证模块 - RBAC 与 JWT"
 
 [dependencies]
 serde = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
 data_core = { path = "../data_core" }
