@@ -14,6 +14,26 @@ use storage_backends::{StorageBackend, LocalBackend};
 use search_indexer::Indexer;
 use messaging_service::{MessageService, NotificationManager};
 
+/// 存储后端类型
+pub enum StorageType {
+    /// 本地存储
+    Local {
+        /// 存储路径
+        path: String,
+    },
+    /// WebDAV 存储
+    Webdav {
+        /// 服务端点
+        endpoint: String,
+        /// 用户名
+        username: String,
+        /// 密码
+        password: String,
+        /// 根目录（可选）
+        root: Option<String>,
+    },
+}
+
 /// SynapseApp - 统一应用入口
 pub struct SynapseApp {
     /// 认证服务
@@ -39,11 +59,59 @@ pub struct SynapseApp {
 }
 
 impl SynapseApp {
-    /// 创建新的 SynapseApp
-    pub fn new(storage_path: &str) -> SynapseResult<Self> {
+    /// 创建新的 SynapseApp（本地存储）
+    pub fn new_local(storage_path: &str) -> SynapseResult<Self> {
         let jwt_config = JwtConfig::default();
         let auth = Box::new(MemoryAuthService::new(jwt_config, "synapse-secret-key"));
         let storage = Box::new(LocalBackend::new(storage_path));
+        let cipher = Cipher::new()?;
+        
+        Ok(Self {
+            auth,
+            storage,
+            cipher,
+            indexer: Indexer::new(),
+            message_service: MessageService::new(),
+            notification_manager: NotificationManager::new(),
+            data_store: HashMap::new(),
+        })
+    }
+    
+    /// 创建新的 SynapseApp（WebDAV 存储）
+    pub fn new_webdav(
+        endpoint: &str,
+        username: &str,
+        password: &str,
+        root: Option<&str>,
+    ) -> SynapseResult<Self> {
+        let jwt_config = JwtConfig::default();
+        let auth = Box::new(MemoryAuthService::new(jwt_config, "synapse-secret-key"));
+        let storage: Box<dyn StorageBackend> = match root {
+            Some(r) => Box::new(storage_backends::WebdavBackend::with_root(
+                endpoint, username, password, r,
+            )?),
+            None => Box::new(storage_backends::WebdavBackend::new(
+                endpoint, username, password,
+            )?),
+        };
+        let cipher = Cipher::new()?;
+        
+        Ok(Self {
+            auth,
+            storage,
+            cipher,
+            indexer: Indexer::new(),
+            message_service: MessageService::new(),
+            notification_manager: NotificationManager::new(),
+            data_store: HashMap::new(),
+        })
+    }
+    
+    /// 创建新的 SynapseApp（通用存储后端）
+    pub fn new_with_storage(
+        auth: Box<dyn AuthService>,
+        storage: Box<dyn StorageBackend>,
+    ) -> SynapseResult<Self> {
         let cipher = Cipher::new()?;
         
         Ok(Self {
@@ -227,7 +295,7 @@ mod tests {
     #[tokio::test]
     async fn test_synapse_app_creation() {
         let temp_dir = TempDir::new().unwrap();
-        let app = SynapseApp::new(temp_dir.path().to_str().unwrap()).unwrap();
+        let app = SynapseApp::new_local(temp_dir.path().to_str().unwrap()).unwrap();
         
         let stats = app.stats();
         assert_eq!(stats.data_count, 0);
@@ -236,7 +304,7 @@ mod tests {
     #[tokio::test]
     async fn test_search() {
         let temp_dir = TempDir::new().unwrap();
-        let mut app = SynapseApp::new(temp_dir.path().to_str().unwrap()).unwrap();
+        let mut app = SynapseApp::new_local(temp_dir.path().to_str().unwrap()).unwrap();
         
         // 手动添加数据到索引
         let entry = search_indexer::IndexEntry {
@@ -256,7 +324,7 @@ mod tests {
     #[tokio::test]
     async fn test_stats() {
         let temp_dir = TempDir::new().unwrap();
-        let mut app = SynapseApp::new(temp_dir.path().to_str().unwrap()).unwrap();
+        let mut app = SynapseApp::new_local(temp_dir.path().to_str().unwrap()).unwrap();
         
         // 添加测试数据
         let entry = search_indexer::IndexEntry {

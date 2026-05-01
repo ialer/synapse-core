@@ -11,3 +11,9 @@ tokio = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
 chrono = { workspace = true }
+opendal = { version = "0.55", default-features = false, features = ["services-webdav", "executors-tokio"] }
+url = "2.4"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+tempfile = "3"

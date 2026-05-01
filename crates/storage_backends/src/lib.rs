@@ -4,8 +4,10 @@
 
 pub mod trait_def;
 pub mod local;
+pub mod webdav;
 pub mod error;
 
 pub use trait_def::{StorageBackend, StorageMetadata};
 pub use local::LocalBackend;
+pub use webdav::WebdavBackend;
 pub use error::{StorageError, StorageResult};
