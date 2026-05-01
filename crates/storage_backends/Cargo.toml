@@ -2,11 +2,12 @@
 name = "storage_backends"
 version.workspace = true
 edition.workspace = true
-description = "storage_backends 模块"
+description = "存储后端模块 - 本地与云端存储"
 
 [dependencies]
 serde = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
-data_core = { path = "../data_core" }
+chrono = { workspace = true }

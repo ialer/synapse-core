@@ -1,7 +1,11 @@
-//! # storage_backends
-//!
-//! 此模块正在开发中。
+//! # Storage Backends - 存储后端模块
+//! 
+//! 提供存储后端的抽象接口和多种实现。
 
-pub fn version() -> &'static str {
-    "0.1.0"
-}
+pub mod trait_def;
+pub mod local;
+pub mod error;
+
+pub use trait_def::{StorageBackend, StorageMetadata};
+pub use local::LocalBackend;
+pub use error::{StorageError, StorageResult};
