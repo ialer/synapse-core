@@ -7,6 +7,7 @@ members = [
     "crates/search_indexer",
     "crates/agent_interface",
     "crates/messaging_service",
+    "crates/synapse_service",
 ]
 resolver = "2"
 

@@ -1,0 +1,24 @@
+[package]
+name = "synapse_service"
+version.workspace = true
+edition.workspace = true
+description = "统一网关服务 - 整合所有模块"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+rmp-serde = { workspace = true }
+tempfile = "3"
+
+# 内部模块
+data_core = { path = "../data_core" }
+iam_core = { path = "../iam_core" }
+storage_backends = { path = "../storage_backends" }
+sync_engine = { path = "../sync_engine" }
+search_indexer = { path = "../search_indexer" }
+messaging_service = { path = "../messaging_service" }
