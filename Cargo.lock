@@ -479,8 +479,9 @@ name = "search_indexer"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "data_core",
  "serde",
+ "serde_json",
+ "storage_backends",
  "thiserror",
  "tokio",
 ]

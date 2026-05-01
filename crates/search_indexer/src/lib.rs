@@ -1,7 +1,11 @@
-//! # search_indexer
-//!
-//! 此模块正在开发中。
+//! # Search Indexer - 搜索索引模块
+//! 
+//! 提供全文搜索与分类检索功能。
 
-pub fn version() -> &'static str {
-    "0.1.0"
-}
+pub mod indexer;
+pub mod query;
+pub mod error;
+
+pub use indexer::{Indexer, IndexEntry, IndexStats};
+pub use query::{QueryParser, ParsedQuery, QueryType};
+pub use error::{SearchError, SearchResult};

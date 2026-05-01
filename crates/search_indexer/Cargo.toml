@@ -2,11 +2,12 @@
 name = "search_indexer"
 version.workspace = true
 edition.workspace = true
-description = "search_indexer 模块"
+description = "搜索索引模块 - 全文搜索与分类检索"
 
 [dependencies]
 serde = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
-data_core = { path = "../data_core" }
+storage_backends = { path = "../storage_backends" }
