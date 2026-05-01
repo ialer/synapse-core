@@ -600,10 +600,13 @@ name = "sync_engine"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "data_core",
+ "chrono",
  "serde",
+ "serde_json",
+ "storage_backends",
  "thiserror",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
