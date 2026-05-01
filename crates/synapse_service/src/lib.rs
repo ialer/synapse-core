@@ -47,6 +47,32 @@ pub enum StorageType {
         /// 根目录（可选）
         root: Option<String>,
     },
+    /// 阿里云 OSS 存储
+    Oss {
+        /// 服务端点
+        endpoint: String,
+        /// 存储桶
+        bucket: String,
+        /// Access Key
+        access_key: String,
+        /// Secret Key
+        secret_key: String,
+        /// 区域（可选）
+        region: Option<String>,
+    },
+    /// Cloudflare R2 存储
+    R2 {
+        /// 账户 ID
+        account_id: String,
+        /// 存储桶
+        bucket: String,
+        /// Access Key
+        access_key: String,
+        /// Secret Key
+        secret_key: String,
+        /// 根目录（可选）
+        root: Option<String>,
+    },
 }
 
 /// SynapseApp - 统一应用入口
@@ -146,6 +172,72 @@ impl SynapseApp {
             )?),
             (None, None) => Box::new(storage_backends::S3Backend::new(
                 endpoint, bucket, access_key, secret_key,
+            )?),
+        };
+        
+        let cipher = Cipher::new()?;
+        
+        Ok(Self {
+            auth,
+            storage,
+            cipher,
+            indexer: Indexer::new(),
+            message_service: MessageService::new(),
+            notification_manager: NotificationManager::new(),
+            data_store: HashMap::new(),
+        })
+    }
+    
+    /// 创建新的 SynapseApp（阿里云 OSS 存储）
+    pub fn new_oss(
+        endpoint: &str,
+        bucket: &str,
+        access_key: &str,
+        secret_key: &str,
+        region: Option<&str>,
+    ) -> SynapseResult<Self> {
+        let jwt_config = JwtConfig::default();
+        let auth = Box::new(MemoryAuthService::new(jwt_config, "synapse-secret-key"));
+        
+        let storage: Box<dyn StorageBackend> = match region {
+            Some(r) => Box::new(storage_backends::OssBackend::with_region(
+                endpoint, bucket, access_key, secret_key, r,
+            )?),
+            None => Box::new(storage_backends::OssBackend::new(
+                endpoint, bucket, access_key, secret_key,
+            )?),
+        };
+        
+        let cipher = Cipher::new()?;
+        
+        Ok(Self {
+            auth,
+            storage,
+            cipher,
+            indexer: Indexer::new(),
+            message_service: MessageService::new(),
+            notification_manager: NotificationManager::new(),
+            data_store: HashMap::new(),
+        })
+    }
+    
+    /// 创建新的 SynapseApp（Cloudflare R2 存储）
+    pub fn new_r2(
+        account_id: &str,
+        bucket: &str,
+        access_key: &str,
+        secret_key: &str,
+        root: Option<&str>,
+    ) -> SynapseResult<Self> {
+        let jwt_config = JwtConfig::default();
+        let auth = Box::new(MemoryAuthService::new(jwt_config, "synapse-secret-key"));
+        
+        let storage: Box<dyn StorageBackend> = match root {
+            Some(r) => Box::new(storage_backends::R2Backend::with_root(
+                account_id, bucket, access_key, secret_key, r,
+            )?),
+            None => Box::new(storage_backends::R2Backend::new(
+                account_id, bucket, access_key, secret_key,
             )?),
         };
         
