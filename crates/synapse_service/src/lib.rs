@@ -9,7 +9,7 @@ use async_trait::async_trait;
 
 use crate::error::{SynapseError, SynapseResult};
 use data_core::{DataEntity, DataType, Cipher};
-use iam_core::{AuthService, JwtConfig, MemoryAuthService, Role};
+use iam_core::{AuthService, JwtConfig, MemoryAuthService};
 use storage_backends::{StorageBackend, LocalBackend};
 use search_indexer::Indexer;
 use messaging_service::{MessageService, NotificationManager};
@@ -29,6 +29,21 @@ pub enum StorageType {
         username: String,
         /// 密码
         password: String,
+        /// 根目录（可选）
+        root: Option<String>,
+    },
+    /// S3/MinIO 存储
+    S3 {
+        /// 服务端点
+        endpoint: String,
+        /// 存储桶
+        bucket: String,
+        /// Access Key
+        access_key: String,
+        /// Secret Key
+        secret_key: String,
+        /// 区域（可选）
+        region: Option<String>,
         /// 根目录（可选）
         root: Option<String>,
     },
@@ -94,6 +109,46 @@ impl SynapseApp {
                 endpoint, username, password,
             )?),
         };
+        let cipher = Cipher::new()?;
+        
+        Ok(Self {
+            auth,
+            storage,
+            cipher,
+            indexer: Indexer::new(),
+            message_service: MessageService::new(),
+            notification_manager: NotificationManager::new(),
+            data_store: HashMap::new(),
+        })
+    }
+    
+    /// 创建新的 SynapseApp（S3/MinIO 存储）
+    pub fn new_s3(
+        endpoint: &str,
+        bucket: &str,
+        access_key: &str,
+        secret_key: &str,
+        region: Option<&str>,
+        root: Option<&str>,
+    ) -> SynapseResult<Self> {
+        let jwt_config = JwtConfig::default();
+        let auth = Box::new(MemoryAuthService::new(jwt_config, "synapse-secret-key"));
+        
+        let storage: Box<dyn StorageBackend> = match (region, root) {
+            (Some(r), Some(rt)) => Box::new(storage_backends::S3Backend::with_config(
+                endpoint, bucket, access_key, secret_key, r, rt,
+            )?),
+            (Some(r), None) => Box::new(storage_backends::S3Backend::with_config(
+                endpoint, bucket, access_key, secret_key, r, "",
+            )?),
+            (None, Some(rt)) => Box::new(storage_backends::S3Backend::with_config(
+                endpoint, bucket, access_key, secret_key, "auto", rt,
+            )?),
+            (None, None) => Box::new(storage_backends::S3Backend::new(
+                endpoint, bucket, access_key, secret_key,
+            )?),
+        };
+        
         let cipher = Cipher::new()?;
         
         Ok(Self {
@@ -224,12 +279,11 @@ impl SynapseApp {
     /// 发送消息
     pub fn send_message(
         &mut self,
-        token: &str,
+        _token: &str,
         recipient_id: &str,
         title: &str,
         content: &str,
     ) -> SynapseResult<()> {
-        // 简化版本：不验证 token
         let message = messaging_service::Message::new(
             "system",
             recipient_id,
@@ -306,7 +360,6 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let mut app = SynapseApp::new_local(temp_dir.path().to_str().unwrap()).unwrap();
         
-        // 手动添加数据到索引
         let entry = search_indexer::IndexEntry {
             id: "1".to_string(),
             content: "github token".to_string(),
@@ -316,7 +369,6 @@ mod tests {
         };
         app.indexer.add_entry(entry);
         
-        // 搜索数据
         let results = app.search("github", 10);
         assert_eq!(results.len(), 1);
     }
@@ -326,7 +378,6 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let mut app = SynapseApp::new_local(temp_dir.path().to_str().unwrap()).unwrap();
         
-        // 添加测试数据
         let entry = search_indexer::IndexEntry {
             id: "1".to_string(),
             content: "test".to_string(),
