@@ -1,7 +1,11 @@
-//! # messaging_service
-//!
-//! 此模块正在开发中。
+//! # Messaging Service - 消息服务模块
+//! 
+//! 提供消息处理与通知管理功能。
 
-pub fn version() -> &'static str {
-    "0.1.0"
-}
+pub mod message;
+pub mod notification;
+pub mod error;
+
+pub use message::{Message, MessageType, MessagePriority, MessageService};
+pub use notification::{Notification, NotificationType, NotificationManager};
+pub use error::{MessageError, MessageResult};
