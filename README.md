@@ -137,24 +137,28 @@ cargo build --release
 ### 基本使用
 
 ```rust
-use data_core::{DataEntity, DataType, Cipher};
+use synapse_core::SynapseCore;
+use synapse_core::data_core::DataType;
 
-// 创建加密器
-let cipher = Cipher::new().expect("密钥生成失败");
+// 创建 SynapseCore 实例
+let mut core = SynapseCore::new("device-1", "user-1");
 
-// 加密数据
-let plaintext = b"my secret data";
-let ciphertext = cipher.encrypt(plaintext, None).expect("加密失败");
-
-// 创建数据实体
-let entity = DataEntity::new(
-    Uuid::new_v4(),
+// 存储数据
+let entity = core.store_data(
     DataType::Credential,
-    ciphertext,
+    b"my-secret-token".to_vec(),
+    vec!["github".to_string()],
 );
 
-// 序列化
-let json = entity.to_json().expect("序列化失败");
+// 搜索数据
+let results = core.search_data("github", 10);
+
+// 发送消息
+core.send_message("user-2", "Task Complete", "GitHub token已更新");
+
+// 获取统计信息
+let stats = core.stats();
+println!("数据数量: {}", stats.data_count);
 ```
 
 ## 📚 模块说明
