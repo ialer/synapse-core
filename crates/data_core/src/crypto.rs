@@ -188,6 +188,7 @@ impl Cipher {
     /// # 示例
     /// 
     /// ```rust
+    /// use data_core::crypto::Cipher;
     /// let cipher = Cipher::new().unwrap();
     /// let ciphertext = cipher.encrypt(b"secret", None).unwrap();
     /// ```

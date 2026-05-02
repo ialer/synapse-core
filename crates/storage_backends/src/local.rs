@@ -55,19 +55,14 @@ impl StorageBackend for LocalBackend {
     
     async fn list(&self, prefix: &str) -> StorageResult<Vec<String>> {
         let mut results = Vec::new();
-        let prefix_path = self.root.join(prefix);
+        let search_dir = if prefix.is_empty() {
+            self.root.clone()
+        } else {
+            self.root.join(prefix)
+        };
         
-        if prefix_path.exists() {
-            let mut entries = tokio::fs::read_dir(&self.root).await?;
-            while let Some(entry) = entries.next_entry().await? {
-                let path = entry.path();
-                if let Some(name) = path.file_name() {
-                    let name_str = name.to_string_lossy().to_string();
-                    if name_str.starts_with(prefix) {
-                        results.push(name_str);
-                    }
-                }
-            }
+        if search_dir.exists() && search_dir.is_dir() {
+            self.list_recursive(&search_dir, &mut results).await?;
         }
         
         Ok(results)
@@ -124,6 +119,23 @@ impl StorageBackend for LocalBackend {
 }
 
 impl LocalBackend {
+    /// 递归列出目录下的所有文件
+    async fn list_recursive(&self, dir: &PathBuf, results: &mut Vec<String>) -> StorageResult<()> {
+        let mut entries = tokio::fs::read_dir(dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            let path = entry.path();
+            if path.is_dir() {
+                Box::pin(self.list_recursive(&path, results)).await?;
+            } else {
+                // 返回相对于 root 的路径
+                if let Ok(relative) = path.strip_prefix(&self.root) {
+                    results.push(relative.to_string_lossy().to_string());
+                }
+            }
+        }
+        Ok(())
+    }
+    
     /// 获取文件元数据
     pub async fn metadata(&self, key: &str) -> StorageResult<StorageMetadata> {
         let path = self.full_path(key);
@@ -208,6 +220,40 @@ mod tests {
         // 删除数据
         backend.delete("test.txt").await.unwrap();
         assert!(!backend.exists("test.txt").await.unwrap());
+        
+        // 清理
+        let _ = tokio::fs::remove_dir_all(&temp_dir).await;
+    }
+    
+    #[tokio::test]
+    async fn test_local_backend_list_recursive() {
+        let temp_dir = env::temp_dir().join("synapse-test-list");
+        let _ = tokio::fs::remove_dir_all(&temp_dir).await;
+        let backend = LocalBackend::new(&temp_dir);
+        
+        // 创建嵌套目录结构
+        backend.save("file1.txt", b"data1").await.unwrap();
+        backend.save("dir1/file2.txt", b"data2").await.unwrap();
+        backend.save("dir1/sub/file3.txt", b"data3").await.unwrap();
+        backend.save("dir2/file4.txt", b"data4").await.unwrap();
+        
+        // 列出所有文件
+        let all = backend.list("").await.unwrap();
+        assert_eq!(all.len(), 4);
+        assert!(all.contains(&"file1.txt".to_string()));
+        assert!(all.contains(&"dir1/file2.txt".to_string()));
+        assert!(all.contains(&"dir1/sub/file3.txt".to_string()));
+        assert!(all.contains(&"dir2/file4.txt".to_string()));
+        
+        // 按前缀过滤
+        let dir1_files = backend.list("dir1/").await.unwrap();
+        assert_eq!(dir1_files.len(), 2);
+        assert!(dir1_files.contains(&"dir1/file2.txt".to_string()));
+        assert!(dir1_files.contains(&"dir1/sub/file3.txt".to_string()));
+        
+        // 空前缀返回空
+        let empty = backend.list("nonexistent/").await.unwrap();
+        assert!(empty.is_empty());
         
         // 清理
         let _ = tokio::fs::remove_dir_all(&temp_dir).await;
