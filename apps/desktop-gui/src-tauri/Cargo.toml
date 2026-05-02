@@ -8,9 +8,9 @@ description = "SynapseCore 桌面端应用"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.0", features = ["full"] }
-tauri = { version = "1.5", features = ["shell-open"] }
-synapse_service = { path = "../../crates/synapse_service" }
-data_core = { path = "../../crates/data_core" }
+tauri = { version = "2", features = [] }
+synapse_service = { path = "../../../crates/synapse_service" }
+data_core = { path = "../../../crates/data_core" }
 
 [build-dependencies]
-tauri-build = { version = "1.5", features = [] }
+tauri-build = { version = "2", features = [] }

@@ -9,6 +9,9 @@ members = [
     "crates/messaging_service",
     "crates/synapse_service",
 ]
+exclude = [
+    "apps/desktop-gui/src-tauri",
+]
 resolver = "2"
 
 [workspace.package]
