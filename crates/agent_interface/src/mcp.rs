@@ -4,6 +4,9 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
+
+use crate::DataProvider;
 
 /// MCP 请求类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -365,15 +368,29 @@ pub struct McpServer {
     
     /// 已注册的工具
     tools: Vec<ToolInfo>,
+    
+    /// 数据提供者
+    provider: Arc<dyn DataProvider>,
 }
 
 impl McpServer {
-    /// 创建新的 MCP 服务器
+    /// 创建新的 MCP 服务器（无数据后端）
     pub fn new(name: &str, version: &str) -> Self {
         Self {
             name: name.to_string(),
             version: version.to_string(),
             tools: Vec::new(),
+            provider: Arc::new(crate::NullDataProvider),
+        }
+    }
+    
+    /// 创建新的 MCP 服务器（带 DataProvider）
+    pub fn with_provider(name: &str, version: &str, provider: Arc<dyn DataProvider>) -> Self {
+        Self {
+            name: name.to_string(),
+            version: version.to_string(),
+            tools: Vec::new(),
+            provider,
         }
     }
     
@@ -390,6 +407,17 @@ impl McpServer {
             McpRequest::CreateData(req) => self.handle_create_data(req),
             McpRequest::UpdateData(req) => self.handle_update_data(req),
             McpRequest::DeleteData(req) => self.handle_delete_data(req),
+        }
+    }
+    
+    /// 异步处理请求（使用 DataProvider 进行真实数据操作）
+    pub async fn handle_request_async(&self, request: McpRequest) -> McpResponse {
+        match request {
+            McpRequest::SearchData(req) => self.handle_search_data_async(req).await,
+            McpRequest::GetData(req) => self.handle_get_data_async(req).await,
+            McpRequest::CreateData(req) => self.handle_create_data_async(req).await,
+            McpRequest::ListResources => self.handle_list_resources_async().await,
+            _ => self.handle_request(request),
         }
     }
     
@@ -423,7 +451,7 @@ impl McpServer {
     
     /// 处理调用工具请求
     fn handle_call_tool(&self, req: CallToolRequest) -> McpResponse {
-        // TODO: 实现工具调用逻辑
+        // TODO: 通过 ToolRegistry 执行工具调用
         McpResponse {
             id: "1".to_string(),
             result: Some(McpResult::ToolCall(ToolCallResult {
@@ -453,9 +481,27 @@ impl McpServer {
         }
     }
     
+    /// 异步处理列出资源请求（返回实际数据统计）
+    async fn handle_list_resources_async(&self) -> McpResponse {
+        let items = self.provider.list_all_data().await;
+        let count = items.len();
+        
+        McpResponse {
+            id: "1".to_string(),
+            result: Some(McpResult::ResourceList(vec![
+                ResourceInfo {
+                    uri: "synapse://data".to_string(),
+                    name: "Personal Data".to_string(),
+                    description: format!("{} data items available", count),
+                    mime_type: "application/json".to_string(),
+                },
+            ])),
+            error: None,
+        }
+    }
+    
     /// 处理读取资源请求
     fn handle_read_resource(&self, req: ReadResourceRequest) -> McpResponse {
-        // TODO: 实现资源读取逻辑
         McpResponse {
             id: "1".to_string(),
             result: Some(McpResult::ResourceContent(ResourceContent {
@@ -467,9 +513,8 @@ impl McpServer {
         }
     }
     
-    /// 处理搜索数据请求
-    fn handle_search_data(&self, _req: SearchRequest) -> McpResponse {
-        // TODO: 实现搜索逻辑
+    /// 处理搜索数据请求（同步版本，返回空结果）
+    fn handle_search_data(&self, req: SearchRequest) -> McpResponse {
         McpResponse {
             id: "1".to_string(),
             result: Some(McpResult::SearchResult(SearchResult {
@@ -480,13 +525,46 @@ impl McpServer {
         }
     }
     
-    /// 处理获取数据请求
-    fn handle_get_data(&self, _req: GetDataRequest) -> McpResponse {
-        // TODO: 实现数据获取逻辑
+    /// 异步处理搜索数据请求（使用 DataProvider）
+    async fn handle_search_data_async(&self, req: SearchRequest) -> McpResponse {
+        let limit = req.limit.unwrap_or(10);
+        let entries = self.provider.search_data(&req.query, limit).await;
+        
+        let results: Vec<SearchResultItem> = entries.into_iter().map(|entry| {
+            let data_type_str = entry.metadata.get("type")
+                .cloned()
+                .unwrap_or_else(|| "generic".to_string());
+            let tags_vec: Vec<String> = entry.metadata.get("tags")
+                .map(|t| t.split(',').map(String::from).collect())
+                .unwrap_or_default();
+            
+            SearchResultItem {
+                id: entry.id,
+                data_type: data_type_str,
+                tags: tags_vec,
+                score: 1.0,
+                summary: entry.content,
+            }
+        }).collect();
+        
+        let total = results.len();
+        
+        McpResponse {
+            id: "1".to_string(),
+            result: Some(McpResult::SearchResult(SearchResult {
+                results,
+                total,
+            })),
+            error: None,
+        }
+    }
+    
+    /// 处理获取数据请求（同步版本，返回空数据）
+    fn handle_get_data(&self, req: GetDataRequest) -> McpResponse {
         McpResponse {
             id: "1".to_string(),
             result: Some(McpResult::DataDetail(DataDetail {
-                id: "test-id".to_string(),
+                id: req.id,
                 owner_id: "test-owner".to_string(),
                 data_type: "credential".to_string(),
                 tags: vec!["test".to_string()],
@@ -498,23 +576,76 @@ impl McpServer {
         }
     }
     
-    /// 处理创建数据请求
+    /// 异步处理获取数据请求（使用 DataProvider）
+    async fn handle_get_data_async(&self, req: GetDataRequest) -> McpResponse {
+        match self.provider.get_data("", &req.id).await {
+            Ok((id, data_type_str, tags, _content)) => {
+                McpResponse {
+                    id: "1".to_string(),
+                    result: Some(McpResult::DataDetail(DataDetail {
+                        id,
+                        owner_id: "agent".to_string(),
+                        data_type: data_type_str,
+                        tags,
+                        created_at: chrono::Utc::now().to_rfc3339(),
+                        updated_at: chrono::Utc::now().to_rfc3339(),
+                        version: 1,
+                    })),
+                    error: None,
+                }
+            }
+            Err(e) => McpResponse {
+                id: "1".to_string(),
+                result: None,
+                error: Some(McpError {
+                    code: -1,
+                    message: e,
+                }),
+            },
+        }
+    }
+    
+    /// 处理创建数据请求（同步版本）
     fn handle_create_data(&self, _req: CreateDataRequest) -> McpResponse {
-        // TODO: 实现数据创建逻辑
         McpResponse {
             id: "1".to_string(),
             result: Some(McpResult::OperationResult(OperationResult {
                 success: true,
-                message: "Data created successfully".to_string(),
-                id: Some("new-id".to_string()),
+                message: "Data created successfully (stub)".to_string(),
+                id: Some("stub-id".to_string()),
             })),
             error: None,
         }
     }
     
+    /// 异步处理创建数据请求（使用 DataProvider）
+    async fn handle_create_data_async(&self, req: CreateDataRequest) -> McpResponse {
+        let tags = req.tags.unwrap_or_default();
+        let content_bytes = req.content.into_bytes();
+        
+        match self.provider.store_data("", &req.data_type, content_bytes, tags).await {
+            Ok(id) => McpResponse {
+                id: "1".to_string(),
+                result: Some(McpResult::OperationResult(OperationResult {
+                    success: true,
+                    message: "Data created successfully".to_string(),
+                    id: Some(id),
+                })),
+                error: None,
+            },
+            Err(e) => McpResponse {
+                id: "1".to_string(),
+                result: None,
+                error: Some(McpError {
+                    code: -1,
+                    message: e,
+                }),
+            },
+        }
+    }
+    
     /// 处理更新数据请求
     fn handle_update_data(&self, _req: UpdateDataRequest) -> McpResponse {
-        // TODO: 实现数据更新逻辑
         McpResponse {
             id: "1".to_string(),
             result: Some(McpResult::OperationResult(OperationResult {
@@ -528,7 +659,6 @@ impl McpServer {
     
     /// 处理删除数据请求
     fn handle_delete_data(&self, _req: DeleteDataRequest) -> McpResponse {
-        // TODO: 实现数据删除逻辑
         McpResponse {
             id: "1".to_string(),
             result: Some(McpResult::OperationResult(OperationResult {
@@ -544,12 +674,20 @@ impl McpServer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::NullDataProvider;
 
     #[test]
     fn test_mcp_server_creation() {
         let server = McpServer::new("synapse-core", "0.1.0");
         assert_eq!(server.name, "synapse-core");
         assert_eq!(server.version, "0.1.0");
+    }
+
+    #[test]
+    fn test_mcp_server_with_provider() {
+        let provider = Arc::new(NullDataProvider);
+        let server = McpServer::with_provider("synapse-core", "0.1.0", provider);
+        assert_eq!(server.name, "synapse-core");
     }
 
     #[test]
@@ -575,5 +713,57 @@ mod tests {
         let response = server.handle_request(McpRequest::ListTools);
         
         assert!(response.result.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_async_search_with_null_provider() {
+        let provider = Arc::new(NullDataProvider);
+        let server = McpServer::with_provider("synapse-core", "0.1.0", provider);
+        
+        let request = McpRequest::SearchData(SearchRequest {
+            query: "github".to_string(),
+            data_type: None,
+            tags: None,
+            limit: Some(10),
+        });
+        
+        let response = server.handle_request_async(request).await;
+        assert!(response.result.is_some());
+        assert!(response.error.is_none());
+        
+        if let Some(McpResult::SearchResult(result)) = response.result {
+            assert_eq!(result.total, 0);
+            assert!(result.results.is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn test_async_get_data_with_null_provider() {
+        let provider = Arc::new(NullDataProvider);
+        let server = McpServer::with_provider("synapse-core", "0.1.0", provider);
+        
+        let request = McpRequest::GetData(GetDataRequest {
+            id: "nonexistent".to_string(),
+        });
+        
+        let response = server.handle_request_async(request).await;
+        // NullDataProvider returns error for get_data
+        assert!(response.error.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_async_create_data_with_null_provider() {
+        let provider = Arc::new(NullDataProvider);
+        let server = McpServer::with_provider("synapse-core", "0.1.0", provider);
+        
+        let request = McpRequest::CreateData(CreateDataRequest {
+            data_type: "credential".to_string(),
+            content: "secret".to_string(),
+            tags: Some(vec!["test".to_string()]),
+        });
+        
+        let response = server.handle_request_async(request).await;
+        // NullDataProvider returns error for store_data
+        assert!(response.error.is_some());
     }
 }

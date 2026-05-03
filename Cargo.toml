@@ -32,6 +32,7 @@ members = [
     "crates/synapse_service",
     "crates/synapse-connect",
     "crates/web_server",
+    "crates/cli",
 ]
 exclude = [
     "apps/desktop-gui/src-tauri",

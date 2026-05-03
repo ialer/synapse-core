@@ -22,3 +22,4 @@ storage_backends = { path = "../storage_backends" }
 sync_engine = { path = "../sync_engine" }
 search_indexer = { path = "../search_indexer" }
 messaging_service = { path = "../messaging_service" }
+agent_interface = { path = "../agent_interface" }

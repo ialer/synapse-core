@@ -6,10 +6,13 @@ pub mod error;
 pub mod sharing;
 pub mod pipeline;
 
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use std::collections::HashMap;
 use async_trait::async_trait;
 
 use crate::error::{SynapseError, SynapseResult};
+use agent_interface::{DataProvider, SearchEntry, ListEntry};
 use data_core::{DataEntity, DataType, Cipher};
 use iam_core::{AuthService, JwtConfig, DiskAuthService, MemoryAuthService};
 use storage_backends::{StorageBackend, LocalBackend};
@@ -585,6 +588,95 @@ pub trait SynapseService: Send + Sync {
     
     /// 搜索数据
     fn search(&self, query: &str, limit: usize) -> Vec<String>;
+}
+
+// ---------------------------------------------------------------------------
+// DataProvider implementation for SynapseApp
+// ---------------------------------------------------------------------------
+
+/// 包装 SynapseApp 以实现 DataProvider trait
+///
+/// 通过 Arc<Mutex<SynapseApp>> 共享所有权，使得 agent_interface 中的
+/// 工具和 MCP 服务器能够访问真实的 SynapseApp 数据操作。
+pub struct AppDataProvider {
+    app: Arc<Mutex<SynapseApp>>,
+}
+
+impl AppDataProvider {
+    /// 创建新的 DataProvider 包装器
+    pub fn new(app: Arc<Mutex<SynapseApp>>) -> Self {
+        Self { app }
+    }
+
+    /// 获取内部 SynapseApp 的引用
+    pub fn app(&self) -> &Arc<Mutex<SynapseApp>> {
+        &self.app
+    }
+}
+
+#[async_trait::async_trait]
+impl DataProvider for AppDataProvider {
+    async fn search_data(&self, query: &str, limit: usize) -> Vec<SearchEntry> {
+        let app = self.app.lock().await;
+        let index_entries = app.search(query, limit);
+
+        index_entries.into_iter().map(|entry| {
+            SearchEntry {
+                id: entry.id,
+                content: entry.content,
+                metadata: entry.metadata,
+            }
+        }).collect()
+    }
+
+    async fn get_data(
+        &self,
+        token: &str,
+        id: &str,
+    ) -> Result<(String, String, Vec<String>, Vec<u8>), String> {
+        let app = self.app.lock().await;
+
+        match app.secure_get_decrypted(token, id).await {
+            Ok((entity, decrypted)) => {
+                let data_type_str = entity.data_type.to_string();
+                let tags = entity.tags.clone();
+                let id_str = entity.id.to_string();
+                Ok((id_str, data_type_str, tags, decrypted))
+            }
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    async fn store_data(
+        &self,
+        token: &str,
+        data_type: &str,
+        content: Vec<u8>,
+        tags: Vec<String>,
+    ) -> Result<String, String> {
+        let mut app = self.app.lock().await;
+
+        let dt = data_core::DataType::from_str(data_type)
+            .ok_or_else(|| format!("Invalid data type: {}", data_type))?;
+
+        match app.secure_store(token, dt, content, tags).await {
+            Ok(entity) => Ok(entity.id.to_string()),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    async fn list_all_data(&self) -> Vec<ListEntry> {
+        let app = self.app.lock().await;
+
+        app.list_all_data().into_iter().map(|info| {
+            ListEntry {
+                id: info.id,
+                data_type: info.data_type,
+                tags: info.tags,
+                created_at: info.created_at,
+            }
+        }).collect()
+    }
 }
 
 #[cfg(test)]

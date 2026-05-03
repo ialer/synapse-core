@@ -3,12 +3,14 @@
 //! 提供 MCP 协议的 Agent 交互功能。
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::mcp::{McpRequest, McpResponse, McpResult, McpError};
 use crate::tools::{ToolRegistry, ToolResult};
 use crate::mcp::ToolInfo;
+use crate::{DataProvider, SearchEntry, ListEntry};
 
 /// Agent 访问权限
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -150,15 +152,53 @@ pub struct MemoryAgentService {
     
     /// 工具注册表
     tool_registry: ToolRegistry,
+
+    /// 数据提供者
+    provider: Arc<dyn DataProvider>,
 }
 
 impl MemoryAgentService {
-    /// 创建新的 Agent 服务
+    /// 创建新的 Agent 服务（无数据后端，使用 NullDataProvider）
     pub fn new() -> Self {
         Self {
             sessions: HashMap::new(),
             tool_registry: ToolRegistry::new(),
+            provider: Arc::new(crate::NullDataProvider),
         }
+    }
+
+    /// 创建新的 Agent 服务（使用指定的 DataProvider）
+    pub fn with_provider(provider: Arc<dyn DataProvider>) -> Self {
+        Self {
+            sessions: HashMap::new(),
+            tool_registry: ToolRegistry::new(),
+            provider,
+        }
+    }
+
+    /// 获取数据提供者的引用
+    pub fn provider(&self) -> &Arc<dyn DataProvider> {
+        &self.provider
+    }
+
+    /// 创建会话并存储（使用 &mut self 以便写入 HashMap）
+    pub fn create_and_store_session(
+        &mut self,
+        agent_id: &str,
+        access: AgentAccess,
+    ) -> AgentSession {
+        let session_id = uuid::Uuid::new_v4().to_string();
+        let now = chrono::Utc::now();
+        
+        let session = AgentSession {
+            session_id: session_id.clone(),
+            agent_id: agent_id.to_string(),
+            access,
+            created_at: now,
+            last_active: now,
+        };
+        self.sessions.insert(session_id, session.clone());
+        session
     }
     
     /// 检查标签访问权限
@@ -192,7 +232,6 @@ impl AgentService for MemoryAgentService {
     }
     
     async fn handle_mcp_request(&self, session_id: &str, request: McpRequest) -> McpResponse {
-        // 简化版本：处理基本请求
         match request {
             McpRequest::Initialize(_) => McpResponse {
                 id: "1".to_string(),
@@ -221,6 +260,69 @@ impl AgentService for MemoryAgentService {
                 ])),
                 error: None,
             },
+            McpRequest::SearchData(req) => {
+                match self.search_with_access(
+                    session_id,
+                    &req.query,
+                    req.data_type.as_deref(),
+                    req.tags.as_deref(),
+                    req.limit.unwrap_or(10),
+                ).await {
+                    Ok(items) => {
+                        let result_items: Vec<crate::mcp::SearchResultItem> = items.into_iter().map(|i| {
+                            crate::mcp::SearchResultItem {
+                                id: i.id.clone(),
+                                data_type: i.data_type.clone(),
+                                tags: i.tags.clone(),
+                                score: i.score,
+                                summary: i.summary.clone(),
+                            }
+                        }).collect();
+                            let total = result_items.len();
+                            McpResponse {
+                                id: "1".to_string(),
+                                result: Some(McpResult::SearchResult(crate::mcp::SearchResult {
+                                    results: result_items,
+                                    total,
+                                })),
+                                error: None,
+                            }
+                        }
+                    Err(e) => McpResponse {
+                        id: "1".to_string(),
+                        result: None,
+                        error: Some(McpError {
+                            code: -1,
+                            message: format!("{:?}", e),
+                        }),
+                    },
+                }
+            }
+            McpRequest::GetData(req) => {
+                match self.get_with_access(session_id, &req.id).await {
+                    Ok(item) => McpResponse {
+                        id: "1".to_string(),
+                        result: Some(McpResult::DataDetail(crate::mcp::DataDetail {
+                            id: item.id,
+                            owner_id: "agent".to_string(),
+                            data_type: item.data_type,
+                            tags: item.tags,
+                            created_at: item.created_at.clone(),
+                            updated_at: item.created_at,
+                            version: 1,
+                        })),
+                        error: None,
+                    },
+                    Err(e) => McpResponse {
+                        id: "1".to_string(),
+                        result: None,
+                        error: Some(McpError {
+                            code: -1,
+                            message: format!("{:?}", e),
+                        }),
+                    },
+                }
+            }
             _ => McpResponse {
                 id: "1".to_string(),
                 result: None,
@@ -266,16 +368,27 @@ impl AgentService for MemoryAgentService {
         // 限制结果数量
         let limited_limit = limit.min(session.access.max_read);
         
-        // 返回模拟结果
-        Ok(vec![
+        // 调用 DataProvider 进行真实搜索
+        let entries = self.provider.search_data(query, limited_limit).await;
+        
+        let results: Vec<SearchResultItem> = entries.into_iter().map(|entry| {
+            let data_type_str = entry.metadata.get("type")
+                .cloned()
+                .unwrap_or_else(|| "generic".to_string());
+            let tags_vec: Vec<String> = entry.metadata.get("tags")
+                .map(|t| t.split(',').map(String::from).collect())
+                .unwrap_or_default();
+            
             SearchResultItem {
-                id: "example-1".to_string(),
-                data_type: "credential".to_string(),
-                tags: vec!["github".to_string()],
-                score: 0.95,
-                summary: "GitHub Token for API access".to_string(),
-            },
-        ])
+                id: entry.id,
+                data_type: data_type_str,
+                tags: tags_vec,
+                score: 1.0, // 简化分数
+                summary: entry.content,
+            }
+        }).collect();
+        
+        Ok(results)
     }
     
     async fn get_with_access(
@@ -284,17 +397,23 @@ impl AgentService for MemoryAgentService {
         data_id: &str,
     ) -> Result<DataItem, AgentError> {
         // 获取会话
-        let _session = self.get_session(session_id)
+        let session = self.get_session(session_id)
             .await
             .ok_or(AgentError::SessionNotFound)?;
         
-        // 返回模拟数据
+        // 调用 DataProvider 获取真实数据
+        // 使用 agent 的 token 进行认证（Agent 场景下使用 session_id 作为 token）
+        let (id, data_type_str, tags, _content) = self.provider
+            .get_data(&session.session_id, data_id)
+            .await
+            .map_err(|e| AgentError::DataNotFound(e))?;
+        
         Ok(DataItem {
-            id: data_id.to_string(),
-            data_type: "credential".to_string(),
-            tags: vec!["github".to_string()],
-            summary: "GitHub Token".to_string(),
-            created_at: "2026-05-01T00:00:00Z".to_string(),
+            id,
+            data_type: data_type_str,
+            tags,
+            summary: format!("Data retrieved by agent {}", session.agent_id),
+            created_at: chrono::Utc::now().to_rfc3339(),
         })
     }
 }
@@ -308,6 +427,7 @@ impl Default for MemoryAgentService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::NullDataProvider;
 
     #[tokio::test]
     async fn test_create_session() {
@@ -324,11 +444,9 @@ mod tests {
         let mut service = MemoryAgentService::new();
         let access = AgentAccess::default();
         
-        let session = service.create_session("test-agent", access).await;
+        // 使用 create_and_store_session 来存储会话
+        let session = service.create_and_store_session("test-agent", access);
         let session_id = session.session_id.clone();
-        
-        // 手动添加会话
-        service.sessions.insert(session_id.clone(), session);
         
         let retrieved = service.get_session(&session_id).await;
         assert!(retrieved.is_some());
@@ -336,8 +454,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_search_with_access() {
-        let mut service = MemoryAgentService::new();
+    async fn test_search_with_access_no_provider() {
+        let mut service = MemoryAgentService::with_provider(Arc::new(NullDataProvider));
         let access = AgentAccess {
             allowed_tags: vec!["github".to_string()],
             allowed_types: vec!["credential".to_string()],
@@ -345,10 +463,10 @@ mod tests {
             max_write: 5,
         };
         
-        let session = service.create_session("test-agent", access).await;
+        let session = service.create_and_store_session("test-agent", access);
         let session_id = session.session_id.clone();
-        service.sessions.insert(session_id.clone(), session);
         
+        // NullDataProvider 返回空结果
         let results = service.search_with_access(
             &session_id,
             "github",
@@ -357,6 +475,64 @@ mod tests {
             10,
         ).await.unwrap();
         
-        assert_eq!(results.len(), 1);
+        assert_eq!(results.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_search_with_access_permission_denied() {
+        let mut service = MemoryAgentService::new();
+        let access = AgentAccess {
+            allowed_tags: vec!["github".to_string()],
+            allowed_types: vec!["credential".to_string()],
+            max_read: 10,
+            max_write: 5,
+        };
+        
+        let session = service.create_and_store_session("test-agent", access);
+        let session_id = session.session_id.clone();
+        
+        // 尝试搜索不允许的类型
+        let result = service.search_with_access(
+            &session_id,
+            "test",
+            Some("config"), // 不在 allowed_types 中
+            None,
+            10,
+        ).await;
+        
+        assert!(result.is_err());
+        match result {
+            Err(AgentError::PermissionDenied(_)) => {},
+            _ => panic!("Expected PermissionDenied"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_search_with_access_session_not_found() {
+        let service = MemoryAgentService::new();
+        
+        let result = service.search_with_access(
+            "nonexistent-session",
+            "test",
+            None,
+            None,
+            10,
+        ).await;
+        
+        assert!(result.is_err());
+        match result {
+            Err(AgentError::SessionNotFound) => {},
+            _ => panic!("Expected SessionNotFound"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_with_provider_constructor() {
+        let provider = Arc::new(NullDataProvider);
+        let mut service = MemoryAgentService::with_provider(provider);
+        
+        let access = AgentAccess::default();
+        let session = service.create_and_store_session("test-agent", access);
+        assert!(!session.session_id.is_empty());
     }
 }

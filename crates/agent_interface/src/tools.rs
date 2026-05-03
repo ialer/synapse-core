@@ -3,7 +3,10 @@
 //! 定义和管理 Agent 可用的工具。
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use async_trait::async_trait;
+
+use crate::{DataProvider, SearchEntry};
 
 /// 工具定义
 #[derive(Debug, Clone)]
@@ -104,8 +107,16 @@ impl Default for ToolRegistry {
     }
 }
 
-/// 预定义工具：搜索个人数据
-pub struct SearchDataTool;
+/// 预定义工具：搜索个人数据（使用 DataProvider）
+pub struct SearchDataTool {
+    provider: Arc<dyn DataProvider>,
+}
+
+impl SearchDataTool {
+    pub fn new(provider: Arc<dyn DataProvider>) -> Self {
+        Self { provider }
+    }
+}
 
 #[async_trait]
 impl ToolExecutor for SearchDataTool {
@@ -114,28 +125,36 @@ impl ToolExecutor for SearchDataTool {
             .and_then(|v| v.as_str())
             .ok_or("Missing 'query' argument")?;
         
-        let data_type = args.get("data_type")
+        let _data_type = args.get("data_type")
             .and_then(|v| v.as_str());
         
         let limit = args.get("limit")
             .and_then(|v| v.as_u64())
             .unwrap_or(10) as usize;
         
-        // TODO: 实际搜索逻辑
-        let results = vec![
+        // 调用真实的 DataProvider 进行搜索
+        let entries = self.provider.search_data(query, limit).await;
+        
+        let results: Vec<serde_json::Value> = entries.into_iter().map(|entry| {
+            let data_type_str = entry.metadata.get("type")
+                .cloned()
+                .unwrap_or_else(|| "generic".to_string());
+            let score_str = entry.metadata.get("score")
+                .and_then(|s| s.parse::<f64>().ok())
+                .unwrap_or(1.0);
+            
             serde_json::json!({
-                "id": "example-1",
-                "type": "credential",
-                "name": "GitHub Token",
-                "score": 0.95
-            }),
-        ];
+                "id": entry.id,
+                "type": data_type_str,
+                "content": entry.content,
+                "score": score_str
+            })
+        }).collect();
         
         Ok(ToolResult {
             success: true,
             output: serde_json::to_string_pretty(&serde_json::json!({
                 "query": query,
-                "data_type": data_type,
                 "limit": limit,
                 "results": results,
                 "total": results.len()
@@ -145,8 +164,16 @@ impl ToolExecutor for SearchDataTool {
     }
 }
 
-/// 预定义工具：获取个人数据
-pub struct GetDataTool;
+/// 预定义工具：获取个人数据（使用 DataProvider）
+pub struct GetDataTool {
+    provider: Arc<dyn DataProvider>,
+}
+
+impl GetDataTool {
+    pub fn new(provider: Arc<dyn DataProvider>) -> Self {
+        Self { provider }
+    }
+}
 
 #[async_trait]
 impl ToolExecutor for GetDataTool {
@@ -155,25 +182,46 @@ impl ToolExecutor for GetDataTool {
             .and_then(|v| v.as_str())
             .ok_or("Missing 'id' argument")?;
         
-        // TODO: 实际获取逻辑
-        Ok(ToolResult {
-            success: true,
-            output: serde_json::to_string_pretty(&serde_json::json!({
-                "id": id,
-                "type": "credential",
-                "name": "GitHub Token",
-                "content": "***encrypted***",
-                "tags": ["github", "token"],
-                "created_at": "2026-05-01T00:00:00Z",
-                "version": 1
-            })).unwrap(),
-            metadata: HashMap::new(),
-        })
+        let token = args.get("token")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        
+        match self.provider.get_data(token, id).await {
+            Ok((id, data_type_str, tags, content)) => {
+                Ok(ToolResult {
+                    success: true,
+                    output: serde_json::to_string_pretty(&serde_json::json!({
+                        "id": id,
+                        "type": data_type_str,
+                        "content": String::from_utf8_lossy(&content).to_string(),
+                        "tags": tags,
+                    })).unwrap(),
+                    metadata: HashMap::new(),
+                })
+            }
+            Err(e) => {
+                Ok(ToolResult {
+                    success: false,
+                    output: serde_json::to_string_pretty(&serde_json::json!({
+                        "error": e
+                    })).unwrap(),
+                    metadata: HashMap::new(),
+                })
+            }
+        }
     }
 }
 
-/// 预定义工具：创建个人数据
-pub struct CreateDataTool;
+/// 预定义工具：创建个人数据（使用 DataProvider）
+pub struct CreateDataTool {
+    provider: Arc<dyn DataProvider>,
+}
+
+impl CreateDataTool {
+    pub fn new(provider: Arc<dyn DataProvider>) -> Self {
+        Self { provider }
+    }
+}
 
 #[async_trait]
 impl ToolExecutor for CreateDataTool {
@@ -186,26 +234,51 @@ impl ToolExecutor for CreateDataTool {
             .and_then(|v| v.as_str())
             .ok_or("Missing 'content' argument")?;
         
+        let token = args.get("token")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        
         let tags: Vec<String> = args.get("tags")
             .and_then(|v| v.as_array())
             .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
             .unwrap_or_default();
         
-        // TODO: 实际创建逻辑
-        Ok(ToolResult {
-            success: true,
-            output: serde_json::to_string_pretty(&serde_json::json!({
-                "success": true,
-                "id": "new-id",
-                "message": format!("Created {} data with {} tags", data_type, tags.len())
-            })).unwrap(),
-            metadata: HashMap::new(),
-        })
+        let content_bytes = content.as_bytes().to_vec();
+        
+        match self.provider.store_data(token, data_type, content_bytes, tags.clone()).await {
+            Ok(id) => {
+                Ok(ToolResult {
+                    success: true,
+                    output: serde_json::to_string_pretty(&serde_json::json!({
+                        "success": true,
+                        "id": id,
+                        "message": format!("Created {} data with {} tags", data_type, tags.len())
+                    })).unwrap(),
+                    metadata: HashMap::new(),
+                })
+            }
+            Err(e) => {
+                Ok(ToolResult {
+                    success: false,
+                    output: serde_json::to_string_pretty(&serde_json::json!({
+                        "success": false,
+                        "error": e
+                    })).unwrap(),
+                    metadata: HashMap::new(),
+                })
+            }
+        }
     }
 }
 
-/// 创建默认工具注册表
+/// 创建默认工具注册表（无数据后端）
 pub fn create_default_registry() -> ToolRegistry {
+    let provider = Arc::new(crate::NullDataProvider);
+    create_registry_with_provider(provider)
+}
+
+/// 创建带 DataProvider 的工具注册表
+pub fn create_registry_with_provider(provider: Arc<dyn DataProvider>) -> ToolRegistry {
     let mut registry = ToolRegistry::new();
     
     // 注册搜索工具
@@ -234,7 +307,7 @@ pub fn create_default_registry() -> ToolRegistry {
             }),
             permissions: vec!["read".to_string()],
         },
-        Box::new(SearchDataTool),
+        Box::new(SearchDataTool::new(provider.clone())),
     );
     
     // 注册获取工具
@@ -248,13 +321,17 @@ pub fn create_default_registry() -> ToolRegistry {
                     "id": {
                         "type": "string",
                         "description": "Data ID"
+                    },
+                    "token": {
+                        "type": "string",
+                        "description": "Authentication token"
                     }
                 },
                 "required": ["id"]
             }),
             permissions: vec!["read".to_string()],
         },
-        Box::new(GetDataTool),
+        Box::new(GetDataTool::new(provider.clone())),
     );
     
     // 注册创建工具
@@ -273,6 +350,10 @@ pub fn create_default_registry() -> ToolRegistry {
                         "type": "string",
                         "description": "Data content"
                     },
+                    "token": {
+                        "type": "string",
+                        "description": "Authentication token"
+                    },
                     "tags": {
                         "type": "array",
                         "items": {
@@ -285,7 +366,7 @@ pub fn create_default_registry() -> ToolRegistry {
             }),
             permissions: vec!["write".to_string()],
         },
-        Box::new(CreateDataTool),
+        Box::new(CreateDataTool::new(provider)),
     );
     
     registry
@@ -294,6 +375,7 @@ pub fn create_default_registry() -> ToolRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::NullDataProvider;
 
     #[tokio::test]
     async fn test_tool_registry() {
@@ -306,7 +388,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_search_tool() {
+    async fn test_search_tool_with_null_provider() {
         let registry = create_default_registry();
         
         let mut args = HashMap::new();
@@ -314,16 +396,44 @@ mod tests {
         
         let result = registry.execute_tool("search_data", args).await.unwrap();
         assert!(result.success);
+        // NullDataProvider returns empty results
+        let output: serde_json::Value = serde_json::from_str(&result.output).unwrap();
+        assert_eq!(output["total"], 0);
     }
 
     #[tokio::test]
-    async fn test_get_tool() {
+    async fn test_get_tool_with_null_provider() {
         let registry = create_default_registry();
         
         let mut args = HashMap::new();
         args.insert("id".to_string(), serde_json::json!("test-id"));
         
         let result = registry.execute_tool("get_data", args).await.unwrap();
-        assert!(result.success);
+        // NullDataProvider returns error, so success should be false
+        assert!(!result.success);
+    }
+
+    #[tokio::test]
+    async fn test_create_tool_with_null_provider() {
+        let registry = create_default_registry();
+        
+        let mut args = HashMap::new();
+        args.insert("data_type".to_string(), serde_json::json!("credential"));
+        args.insert("content".to_string(), serde_json::json!("secret-password"));
+        args.insert("tags".to_string(), serde_json::json!(["github", "token"]));
+        
+        let result = registry.execute_tool("create_data", args).await.unwrap();
+        // NullDataProvider returns error, so success should be false
+        assert!(!result.success);
+    }
+
+    #[tokio::test]
+    async fn test_tool_not_found() {
+        let registry = create_default_registry();
+        let args = HashMap::new();
+        
+        let result = registry.execute_tool("nonexistent_tool", args).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
     }
 }
