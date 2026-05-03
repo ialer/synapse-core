@@ -1,80 +1,163 @@
-// SynapseCore API 封装
-// Tauri invoke 命令包装，类型安全
+// SynapseCore API - HTTP fetch adapter
+// Works in both Tauri (desktop) and browser (web) modes
+// All communication goes through the HTTP web server
 
-import { invoke } from '@tauri-apps/api/core'
+import { request } from './adapter'
+import { setToken, clearToken } from './auth'
 import type { SearchResult, StatsInfo, MessageInfo, DataType, DataItemInfo, StorageInfo } from '../types'
 
-/** 登录 */
+// ============================================================
+// Auth
+// ============================================================
+
+/** Login - stores token automatically */
 export async function login(username: string, password: string): Promise<string> {
-  return await invoke('login', { username, password })
+  const resp = await request<{ token: string }>('POST', '/api/login', { username, password })
+  setToken(resp.token)
+  return resp.token
 }
 
-/** 存储数据 */
+/** Register user - stores token automatically */
+export async function registerUser(username: string, password: string): Promise<string> {
+  const resp = await request<{ token: string }>('POST', '/api/register', { username, password })
+  setToken(resp.token)
+  return resp.token
+}
+
+/** Logout - clears stored token */
+export function logout(): void {
+  clearToken()
+}
+
+// ============================================================
+// Data
+// ============================================================
+
+/** Store data - returns the new item ID */
 export async function storeData(
   token: string,
   dataType: DataType,
   content: string,
   tags: string[]
 ): Promise<string> {
-  return await invoke('store_data', { token, dataType, content, tags })
+  const resp = await request<{ id: string }>('POST', '/api/data', {
+    token,
+    data_type: dataType,
+    content,
+    tags,
+  })
+  return resp.id
 }
 
-/** 获取数据 */
+/** Get data detail by ID - returns the decrypted content string */
 export async function getData(token: string, id: string): Promise<string> {
-  return await invoke('get_data', { token, id })
+  const resp = await request<{ content: string }>('GET', `/api/data/${id}?token=${encodeURIComponent(token)}`)
+  return resp.content
 }
 
-/** 搜索数据 */
-export async function searchData(query: string, limit: number = 10): Promise<SearchResult[]> {
-  return await invoke('search_data', { query, limit })
-}
-
-/** 删除数据 */
-export async function deleteData(token: string, id: string): Promise<boolean> {
-  return await invoke('delete_data', { token, id })
-}
-
-/** 获取统计信息 */
-export async function getStats(): Promise<StatsInfo> {
-  return await invoke('get_stats')
-}
-
-/** 发送消息 */
-export async function sendMessage(
-  token: string,
-  recipientId: string,
-  title: string,
-  content: string
-): Promise<boolean> {
-  return await invoke('send_message', { token, recipientId, title, content })
-}
-
-/** 获取用户消息 */
-export async function getMessages(userId: string, limit: number = 50): Promise<MessageInfo[]> {
-  return await invoke('get_messages', { userId, limit })
-}
-
-/** 列出所有数据 */
+/** List all data items for a user */
 export async function listData(token: string): Promise<DataItemInfo[]> {
-  return await invoke('list_data', { token })
+  const resp = await request<{ items: DataItemInfo[]; total: number }>('GET', `/api/data/list?token=${encodeURIComponent(token)}`)
+  return resp.items
 }
 
-/** 更新数据 */
+/** Update existing data */
 export async function updateData(
   token: string,
   id: string,
   content: string,
   tags: string[]
 ): Promise<boolean> {
-  return await invoke('update_data', { token, id, content, tags })
+  const resp = await request<{ success: boolean }>('PUT', `/api/data/${id}`, {
+    token,
+    content,
+    tags,
+  })
+  return resp.success
 }
 
-/** 获取存储信息 */
+/** Delete data by ID */
+export async function deleteData(token: string, id: string): Promise<boolean> {
+  const resp = await request<{ success: boolean }>('DELETE', `/api/data/${id}?token=${encodeURIComponent(token)}`)
+  return resp.success
+}
+
+// ============================================================
+// Search
+// ============================================================
+
+/** Search data by query */
+export async function searchData(query: string, limit: number = 10): Promise<SearchResult[]> {
+  return request<SearchResult[]>('GET', `/api/search?q=${encodeURIComponent(query)}&limit=${limit}`)
+}
+
+// ============================================================
+// Stats
+// ============================================================
+
+/** Get system statistics */
+export async function getStats(): Promise<StatsInfo> {
+  return request<StatsInfo>('GET', '/api/stats')
+}
+
+// ============================================================
+// Messages
+// ============================================================
+
+/** Send a message */
+export async function sendMessage(
+  token: string,
+  recipientId: string,
+  title: string,
+  content: string
+): Promise<boolean> {
+  const resp = await request<{ success: boolean }>('POST', '/api/messages', {
+    token,
+    recipient_id: recipientId,
+    title,
+    content,
+  })
+  return resp.success
+}
+
+/** Get messages for a user - maps API field names to frontend types */
+export async function getMessages(userId: string, limit: number = 50): Promise<MessageInfo[]> {
+  const resp = await request<Array<{
+    id: string
+    sender_id: string
+    recipient_id: string
+    title: string
+    content: string
+    sent_at: string
+    is_read: boolean
+  }>>(  'GET', `/api/messages/${encodeURIComponent(userId)}?limit=${limit}`)
+
+  // Map API response fields to frontend MessageInfo type
+  return resp.map((m) => ({
+    id: m.id,
+    from: m.sender_id,
+    to: m.recipient_id,
+    title: m.title,
+    content: m.content,
+    timestamp: m.sent_at,
+  }))
+}
+
+// ============================================================
+// Storage Info
+// ============================================================
+
+/** Get storage configuration info */
 export async function getStorageInfo(): Promise<StorageInfo> {
-  return await invoke('get_storage_info')
-}
-
-/** 注册用户 */
-export async function registerUser(username: string, password: string): Promise<string> {
-  return await invoke('register_user', { username, password })
+  // No dedicated endpoint in the web server yet
+  // Return a default value for browser mode
+  return request<StorageInfo>('GET', '/api/health')
+    .then(() => ({
+      backend_type: 'local',
+      is_configured: true,
+    }))
+    .catch(() => ({
+      backend_type: 'unknown',
+      is_configured: false,
+    }))
 }

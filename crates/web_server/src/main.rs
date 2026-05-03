@@ -86,6 +86,26 @@ struct TokenQuery {
 #[derive(Deserialize)]
 struct ListDataQuery {
     token: String,
+    #[serde(default = "default_offset")]
+    offset: usize,
+    #[serde(default = "default_limit_val")]
+    limit: usize,
+}
+
+fn default_offset() -> usize {
+    0
+}
+
+fn default_limit_val() -> usize {
+    20
+}
+
+#[derive(Serialize)]
+struct ListDataResponse {
+    items: Vec<DataItemResponse>,
+    total: usize,
+    offset: usize,
+    limit: usize,
 }
 
 #[derive(Serialize)]
@@ -112,6 +132,8 @@ struct SearchQuery {
     q: String,
     #[serde(default = "default_limit")]
     limit: usize,
+    #[serde(default)]
+    tag: Option<String>,
 }
 
 fn default_limit() -> usize {
@@ -264,11 +286,11 @@ async fn get_data(
     Query(q): Query<TokenQuery>,
 ) -> impl IntoResponse {
     let app = state.app.lock().await;
-    match app.secure_get(&q.token, &id).await {
-        Ok(entity) => Json(DataDetailResponse {
+    match app.secure_get_decrypted(&q.token, &id).await {
+        Ok((entity, decrypted)) => Json(DataDetailResponse {
             id: entity.id.to_string(),
             data_type: entity.data_type.to_string(),
-            content: String::from_utf8_lossy(&entity.encrypted_content).to_string(),
+            content: String::from_utf8_lossy(&decrypted).to_string(),
             tags: entity.tags,
             created_at: entity.created_at.to_rfc3339(),
             updated_at: entity.updated_at.to_rfc3339(),
@@ -290,7 +312,7 @@ async fn list_data(
         return error_response(StatusCode::UNAUTHORIZED, "Invalid token").into_response();
     }
 
-    let items: Vec<DataItemResponse> = app
+    let all_items: Vec<DataItemResponse> = app
         .data_store
         .values()
         .map(|e| DataItemResponse {
@@ -301,7 +323,20 @@ async fn list_data(
         })
         .collect();
 
-    Json(items).into_response()
+    let total = all_items.len();
+    let items: Vec<DataItemResponse> = all_items
+        .into_iter()
+        .skip(q.offset)
+        .take(q.limit)
+        .collect();
+
+    Json(ListDataResponse {
+        items,
+        total,
+        offset: q.offset,
+        limit: q.limit,
+    })
+    .into_response()
 }
 
 // PUT /api/data/:id
@@ -333,12 +368,37 @@ async fn delete_data(
     }
 }
 
-// GET /api/search?q=xxx&limit=10
+// GET /api/search?q=xxx&limit=10&tag=xxx
 async fn search(
     State(state): State<SharedState>,
     Query(q): Query<SearchQuery>,
 ) -> Json<Vec<SearchItemResponse>> {
     let app = state.app.lock().await;
+
+    // If tag filter is provided, filter from data_store by tags
+    if let Some(ref tag) = q.tag {
+        let tag_lower = tag.to_lowercase();
+        let items: Vec<SearchItemResponse> = app
+            .data_store
+            .values()
+            .filter(|e| e.tags.iter().any(|t| t.to_lowercase().contains(&tag_lower)))
+            .take(q.limit)
+            .map(|e| {
+                let content = String::from_utf8_lossy(&e.encrypted_content).to_string();
+                SearchItemResponse {
+                    id: e.id.to_string(),
+                    content,
+                    metadata: HashMap::from([
+                        ("type".to_string(), e.data_type.to_string()),
+                        ("tags".to_string(), e.tags.join(",")),
+                    ]),
+                }
+            })
+            .collect();
+        return Json(items);
+    }
+
+    // Default: full-text search via indexer
     let results = app.search(&q.q, q.limit);
     let items: Vec<SearchItemResponse> = results
         .into_iter()

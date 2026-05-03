@@ -336,6 +336,13 @@ impl SynapseApp {
         
         Ok(entity)
     }
+
+    /// 获取并解密数据
+    pub async fn secure_get_decrypted(&self, token: &str, id: &str) -> SynapseResult<(DataEntity, Vec<u8>)> {
+        let entity = self.secure_get(token, id).await?;
+        let decrypted = self.cipher.decrypt(&entity.encrypted_content, None)?;
+        Ok((entity, decrypted))
+    }
     
     /// 搜索数据
     pub fn search(&self, query: &str, limit: usize) -> Vec<search_indexer::IndexEntry> {
