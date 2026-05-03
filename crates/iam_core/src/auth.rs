@@ -28,6 +28,9 @@ pub trait AuthService: Send + Sync {
     
     /// 检查用户权限
     async fn check_permission(&self, user_id: &str, permission: &str) -> AuthResult<bool>;
+
+    /// 注册新用户
+    async fn register(&self, username: &str, password: &str) -> AuthResult<LoginResult>;
 }
 
 /// 登录结果
@@ -188,6 +191,19 @@ impl AuthService for MemoryAuthService {
             .ok_or_else(|| crate::error::AuthError::InvalidToken(format!("Invalid permission: {}", permission)))?;
         
         Ok(user_role.has_permission(&permission))
+    }
+
+    async fn register(&self, username: &str, password: &str) -> AuthResult<LoginResult> {
+        // 检查用户是否已存在
+        if self.find_user(username).is_some() {
+            return Err(crate::error::AuthError::InvalidCredentials);
+        }
+
+        // 添加新用户
+        self.add_user(username, password, Role::User);
+
+        // 登录并返回结果
+        self.login(username, password).await
     }
 }
 

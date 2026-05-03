@@ -2,7 +2,7 @@
 // Tauri invoke 命令包装，类型安全
 
 import { invoke } from '@tauri-apps/api/core'
-import type { SearchResult, StatsInfo, MessageInfo, DataType } from '../types'
+import type { SearchResult, StatsInfo, MessageInfo, DataType, DataItemInfo, StorageInfo } from '../types'
 
 /** 登录 */
 export async function login(username: string, password: string): Promise<string> {
@@ -52,4 +52,29 @@ export async function sendMessage(
 /** 获取用户消息 */
 export async function getMessages(userId: string, limit: number = 50): Promise<MessageInfo[]> {
   return await invoke('get_messages', { userId, limit })
+}
+
+/** 列出所有数据 */
+export async function listData(token: string): Promise<DataItemInfo[]> {
+  return await invoke('list_data', { token })
+}
+
+/** 更新数据 */
+export async function updateData(
+  token: string,
+  id: string,
+  content: string,
+  tags: string[]
+): Promise<boolean> {
+  return await invoke('update_data', { token, id, content, tags })
+}
+
+/** 获取存储信息 */
+export async function getStorageInfo(): Promise<StorageInfo> {
+  return await invoke('get_storage_info')
+}
+
+/** 注册用户 */
+export async function registerUser(username: string, password: string): Promise<string> {
+  return await invoke('register_user', { username, password })
 }

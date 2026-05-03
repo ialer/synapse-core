@@ -96,7 +96,7 @@ pub struct SynapseApp {
     notification_manager: NotificationManager,
     
     /// 数据存储（内存版本）
-    data_store: HashMap<String, DataEntity>,
+    pub data_store: HashMap<String, DataEntity>,
 }
 
 impl SynapseApp {
@@ -392,6 +392,67 @@ impl SynapseApp {
             .into_iter()
             .cloned()
             .collect()
+    }
+    
+    /// 注册新用户
+    pub async fn register(&mut self, username: &str, password: &str) -> SynapseResult<String> {
+        // 通过认证服务注册并登录
+        let result = self.auth.register(username, password).await?;
+        Ok(result.access_token)
+    }
+
+    /// 更新加密数据
+    pub async fn secure_update(
+        &mut self,
+        token: &str,
+        id: &str,
+        data: Vec<u8>,
+        tags: Vec<String>,
+    ) -> SynapseResult<bool> {
+        // 1. 验证权限
+        let claims = self.auth.verify_token(token).await?;
+
+        // 2. 获取现有数据
+        let key = format!("data/{}", id);
+        let raw = self.storage.load(&key).await?;
+        let mut entity = DataEntity::from_msgpack(&raw)?;
+
+        // 3. 检查所有权
+        if entity.owner_id.to_string() != claims.sub {
+            return Err(SynapseError::PermissionDenied("Not owner".to_string()));
+        }
+
+        // 4. 重新加密数据
+        let encrypted = self.cipher.encrypt(&data, None)?;
+
+        // 5. 更新实体
+        entity.update_content(encrypted);
+        entity.tags = tags.clone();
+
+        // 6. 保存到存储
+        self.storage.save(&key, &entity.to_msgpack()?).await?;
+
+        // 7. 更新索引 - 先移除旧条目，再添加新条目
+        self.indexer.remove_entry(id);
+        let entry = search_indexer::IndexEntry {
+            id: entity.id.to_string(),
+            content: String::from_utf8_lossy(&data).to_string(),
+            metadata: HashMap::from([
+                ("type".to_string(), entity.data_type.to_string()),
+                ("tags".to_string(), tags.join(",")),
+            ]),
+        };
+        self.indexer.add_entry(entry);
+
+        // 8. 更新内存存储
+        self.data_store.insert(id.to_string(), entity);
+
+        Ok(true)
+    }
+
+    /// 验证 token
+    pub async fn verify_token(&self, token: &str) -> Result<iam_core::Claims, iam_core::AuthError> {
+        self.auth.verify_token(token).await
     }
     
     /// 获取统计信息

@@ -14,3 +14,23 @@ data_core = { path = "../../../crates/data_core" }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
+
+[profile.release-mobile]
+inherits = "release"
+opt-level = "s"
+strip = true
+
+[profile.release-mobile-android]
+inherits = "release-mobile"
+target = "aarch64-linux-android"
+
+[profile.release-mobile-ios]
+inherits = "release-mobile"
+target = "aarch64-apple-ios"

@@ -78,6 +78,20 @@ export interface LoadingState {
   error: string | null
 }
 
+/** 数据条目信息（列表展示） */
+export interface DataItemInfo {
+  id: string
+  data_type: string
+  tags: string[]
+  created_at: string
+}
+
+/** 存储信息 */
+export interface StorageInfo {
+  backend_type: string
+  is_configured: boolean
+}
+
 /** 数据类型选项 */
 export const DATA_TYPE_OPTIONS: { value: DataType; label: string; icon: string }[] = [
   { value: 'credential', label: '凭证', icon: '🔑' },

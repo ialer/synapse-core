@@ -138,6 +138,64 @@ async fn get_messages(state: State<'_, AppState>, user_id: String, limit: usize)
     Ok(message_infos)
 }
 
+/// 列出所有数据命令
+#[tauri::command]
+async fn list_data(state: State<'_, AppState>, token: String) -> Result<Vec<DataItemInfo>, String> {
+    let app = state.app.lock().await;
+
+    // 验证 token
+    app.verify_token(&token).await.map_err(|e| e.to_string())?;
+
+    let items: Vec<DataItemInfo> = app.data_store.values().map(|entity| {
+        DataItemInfo {
+            id: entity.id.to_string(),
+            data_type: entity.data_type.as_str().to_string(),
+            tags: entity.tags.clone(),
+            created_at: entity.created_at.to_rfc3339(),
+        }
+    }).collect();
+
+    Ok(items)
+}
+
+/// 更新数据命令
+#[tauri::command]
+async fn update_data(
+    state: State<'_, AppState>,
+    token: String,
+    id: String,
+    content: String,
+    tags: Vec<String>,
+) -> Result<bool, String> {
+    let mut app = state.app.lock().await;
+
+    app.secure_update(&token, &id, content.into_bytes(), tags)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 获取存储信息命令
+#[tauri::command]
+async fn get_storage_info(state: State<'_, AppState>) -> Result<StorageInfo, String> {
+    let _app = state.app.lock().await;
+
+    // 当前使用 LocalBackend（在 new_local 中创建）
+    Ok(StorageInfo {
+        backend_type: "local".to_string(),
+        is_configured: true,
+    })
+}
+
+/// 注册用户命令
+#[tauri::command]
+async fn register_user(state: State<'_, AppState>, username: String, password: String) -> Result<String, String> {
+    let mut app = state.app.lock().await;
+
+    app.register(&username, &password)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 搜索结果
 #[derive(serde::Serialize)]
 struct SearchResult {
@@ -165,6 +223,22 @@ struct MessageInfo {
     timestamp: String,
 }
 
+/// 数据条目信息（用于列表展示）
+#[derive(serde::Serialize)]
+struct DataItemInfo {
+    id: String,
+    data_type: String,
+    tags: Vec<String>,
+    created_at: String,
+}
+
+/// 存储信息
+#[derive(serde::Serialize)]
+struct StorageInfo {
+    backend_type: String,
+    is_configured: bool,
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(AppState {
@@ -181,6 +255,10 @@ fn main() {
             get_stats,
             send_message,
             get_messages,
+            list_data,
+            update_data,
+            get_storage_info,
+            register_user,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

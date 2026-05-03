@@ -7,7 +7,17 @@
     "dev": "vite",
     "build": "vue-tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "android:init": "tauri android init",
+    "android:dev": "tauri android dev",
+    "android:build": "tauri android build",
+    "android:build:debug": "tauri android build --debug",
+    "android:build:release": "tauri android build --release",
+    "ios:init": "tauri ios init",
+    "ios:dev": "tauri ios dev",
+    "ios:build": "tauri ios build",
+    "ios:build:debug": "tauri ios build --debug",
+    "ios:build:release": "tauri ios build --release"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
