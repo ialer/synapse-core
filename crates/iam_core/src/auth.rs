@@ -2,7 +2,10 @@
 //! 
 //! 定义 AuthService Trait，提供认证功能的接口。
 
+use std::path::PathBuf;
+
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 
 use crate::error::AuthResult;
 use crate::jwt::{Claims, JwtConfig, JwtService};
@@ -78,8 +81,8 @@ pub struct MemoryAuthService {
 }
 
 /// 用户记录
-#[derive(Debug, Clone)]
-struct UserRecord {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserRecord {
     /// 用户 ID
     id: String,
     
@@ -126,6 +129,17 @@ impl MemoryAuthService {
             .iter()
             .find(|u| u.username == username)
             .cloned()
+    }
+    
+    /// 获取所有用户（用于持久化）
+    pub fn get_users(&self) -> Vec<UserRecord> {
+        self.users.read().unwrap().clone()
+    }
+    
+    /// 从持久化数据加载用户（用于启动时恢复）
+    pub fn load_users(&self, users: Vec<UserRecord>) {
+        let mut current = self.users.write().unwrap();
+        *current = users;
     }
 }
 
@@ -204,6 +218,117 @@ impl AuthService for MemoryAuthService {
 
         // 登录并返回结果
         self.login(username, password).await
+    }
+}
+
+/// 磁盘认证服务 - 持久化用户数据到 JSON 文件
+pub struct DiskAuthService {
+    /// 内存认证服务（核心逻辑）
+    inner: MemoryAuthService,
+    
+    /// 用户数据文件路径
+    users_file: PathBuf,
+}
+
+impl DiskAuthService {
+    /// 创建新的磁盘认证服务
+    /// 
+    /// 从 `{storage_path}/users.json` 加载已有的用户数据（如果文件存在）。
+    pub fn new(jwt_config: JwtConfig, secret: impl Into<String>, storage_path: &str) -> Self {
+        let users_file = PathBuf::from(storage_path).join("users.json");
+        let inner = MemoryAuthService::new(jwt_config, secret);
+        
+        // 尝试从文件加载用户数据
+        if users_file.exists() {
+            match Self::load_users_from_file(&users_file) {
+                Ok(users) => {
+                    inner.load_users(users);
+                }
+                Err(e) => {
+                    eprintln!("[disk_auth] 加载用户数据失败: {}", e);
+                }
+            }
+        }
+        
+        Self {
+            inner,
+            users_file,
+        }
+    }
+    
+    /// 从文件加载用户数据
+    fn load_users_from_file(path: &PathBuf) -> Result<Vec<UserRecord>, Box<dyn std::error::Error>> {
+        let data = std::fs::read_to_string(path)?;
+        let users: Vec<UserRecord> = serde_json::from_str(&data)?;
+        Ok(users)
+    }
+    
+    /// 保存用户数据到文件
+    fn save_users_to_file(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let users = self.inner.get_users();
+        let json = serde_json::to_string_pretty(&users)?;
+        
+        // 确保父目录存在
+        if let Some(parent) = self.users_file.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        
+        std::fs::write(&self.users_file, json)?;
+        Ok(())
+    }
+    
+    /// 添加用户并持久化
+    pub fn add_user(&self, username: &str, password: &str, role: Role) {
+        self.inner.add_user(username, password, role);
+        
+        // 保存到磁盘
+        if let Err(e) = self.save_users_to_file() {
+            eprintln!("[disk_auth] 保存用户数据失败: {}", e);
+        }
+    }
+    
+    /// 获取用户数据文件路径
+    pub fn users_file_path(&self) -> &PathBuf {
+        &self.users_file
+    }
+}
+
+#[async_trait]
+impl AuthService for DiskAuthService {
+    async fn login(&self, username: &str, password: &str) -> AuthResult<LoginResult> {
+        self.inner.login(username, password).await
+    }
+    
+    async fn logout(&self, token: &str) -> AuthResult<()> {
+        self.inner.logout(token).await
+    }
+    
+    async fn verify_token(&self, token: &str) -> AuthResult<Claims> {
+        self.inner.verify_token(token).await
+    }
+    
+    async fn refresh_token(&self, refresh_token: &str) -> AuthResult<RefreshResult> {
+        self.inner.refresh_token(refresh_token).await
+    }
+    
+    async fn get_user_role(&self, user_id: &str) -> AuthResult<UserRole> {
+        self.inner.get_user_role(user_id).await
+    }
+    
+    async fn check_permission(&self, user_id: &str, permission: &str) -> AuthResult<bool> {
+        self.inner.check_permission(user_id, permission).await
+    }
+
+    async fn register(&self, username: &str, password: &str) -> AuthResult<LoginResult> {
+        // 先注册
+        let result = self.inner.register(username, password).await?;
+        
+        // 注册成功后保存到磁盘
+        if let Err(e) = self.save_users_to_file() {
+            eprintln!("[disk_auth] 注册后保存用户数据失败: {}", e);
+        }
+        
+        Ok(result)
     }
 }
 

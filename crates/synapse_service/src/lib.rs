@@ -9,7 +9,7 @@ use async_trait::async_trait;
 
 use crate::error::{SynapseError, SynapseResult};
 use data_core::{DataEntity, DataType, Cipher};
-use iam_core::{AuthService, JwtConfig, MemoryAuthService};
+use iam_core::{AuthService, JwtConfig, DiskAuthService, MemoryAuthService};
 use storage_backends::{StorageBackend, LocalBackend};
 use search_indexer::Indexer;
 use messaging_service::{MessageService, NotificationManager};
@@ -103,7 +103,7 @@ impl SynapseApp {
     /// 创建新的 SynapseApp（本地存储）
     pub fn new_local(storage_path: &str) -> SynapseResult<Self> {
         let jwt_config = JwtConfig::default();
-        let auth = Box::new(MemoryAuthService::new(jwt_config, "synapse-secret-key"));
+        let auth = Box::new(DiskAuthService::new(jwt_config, "synapse-secret-key", storage_path));
         let storage = Box::new(LocalBackend::new(storage_path));
         let cipher = Cipher::new()?;
         
@@ -448,6 +448,38 @@ impl SynapseApp {
         self.data_store.insert(id.to_string(), entity);
 
         Ok(true)
+    }
+
+    /// 从磁盘加载所有数据到内存（data_store 和 indexer）
+    pub async fn load_from_disk(&mut self) -> SynapseResult<usize> {
+        let keys = self.storage.list("data/").await?;
+        let mut count = 0;
+        for key in &keys {
+            if let Ok(data) = self.storage.load(key).await {
+                if let Ok(entity) = DataEntity::from_msgpack(&data) {
+                    // Add to indexer
+                    let entry = search_indexer::IndexEntry {
+                        id: entity.id.to_string(),
+                        content: String::from_utf8_lossy(&entity.encrypted_content).to_string(),
+                        metadata: HashMap::from([
+                            ("type".to_string(), entity.data_type.to_string()),
+                            ("tags".to_string(), entity.tags.join(",")),
+                        ]),
+                    };
+                    self.indexer.add_entry(entry);
+                    self.data_store.insert(entity.id.to_string(), entity);
+                    count += 1;
+                }
+            }
+        }
+        Ok(count)
+    }
+
+    /// 异步初始化：从磁盘恢复 data_store 和 indexer
+    pub async fn init(&mut self) -> SynapseResult<()> {
+        let count = self.load_from_disk().await?;
+        println!("[synapse] 从磁盘加载了 {} 条数据", count);
+        Ok(())
     }
 
     /// 验证 token

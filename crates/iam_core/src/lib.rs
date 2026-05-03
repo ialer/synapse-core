@@ -13,7 +13,7 @@ pub mod rbac;
 pub mod jwt;
 pub mod error;
 
-pub use auth::{AuthService, MemoryAuthService, LoginResult, RefreshResult};
+pub use auth::{AuthService, MemoryAuthService, DiskAuthService, LoginResult, RefreshResult};
 pub use rbac::{Role, Permission, UserRole, PermissionChecker};
 pub use jwt::{Claims, JwtConfig, JwtService};
 pub use error::{AuthError, AuthResult};

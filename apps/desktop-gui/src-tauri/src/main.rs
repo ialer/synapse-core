@@ -240,11 +240,19 @@ struct StorageInfo {
 }
 
 fn main() {
+    // Create app first
+    let mut app = SynapseApp::new_local("/tmp/synapse-data")
+        .expect("Failed to create SynapseApp");
+
+    // Initialize from disk: load data_store and indexer
+    let rt = tokio::runtime::Runtime::new()
+        .expect("Failed to create Tokio runtime for init");
+    rt.block_on(app.init())
+        .expect("Failed to initialize SynapseApp from disk");
+
     tauri::Builder::default()
         .manage(AppState {
-            app: tokio::sync::Mutex::new(
-                SynapseApp::new_local("/tmp/synapse-data").expect("Failed to create SynapseApp")
-            ),
+            app: tokio::sync::Mutex::new(app),
         })
         .invoke_handler(tauri::generate_handler![
             login,
