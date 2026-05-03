@@ -1,8 +1,9 @@
 //! JWT 签发与校验模块
 //! 
-//! 实现 JWT (JSON Web Token) 的签发与校验功能。
+//! 实现 JWT (JSON Web Token) 的签发与校验功能，使用 HMAC-SHA256 进行签名。
 
 use chrono::{DateTime, Utc, Duration};
+use ring::hmac;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -121,16 +122,18 @@ pub struct JwtService {
     /// 配置
     config: JwtConfig,
     
-    /// 签名密钥（简化版本，生产环境应使用更安全的密钥管理）
-    secret: String,
+    /// HMAC-SHA256 签名密钥
+    hmac_key: hmac::Key,
 }
 
 impl JwtService {
     /// 创建新的 JWT 服务
     pub fn new(config: JwtConfig, secret: impl Into<String>) -> Self {
+        let secret_bytes = secret.into().into_bytes();
+        let hmac_key = hmac::Key::new(hmac::HMAC_SHA256, &secret_bytes);
         Self {
             config,
-            secret: secret.into(),
+            hmac_key,
         }
     }
     
@@ -144,15 +147,7 @@ impl JwtService {
             self.config.expiry_hours,
         );
         
-        // 简化版本：Base64 编码
-        // 生产环境应使用 HMAC-SHA256 或 RSA 签名
-        let payload = serde_json::to_string(&claims)
-            .map_err(|e| AuthError::InternalError(e.to_string()))?;
-        
-        let encoded = base64_encode(payload.as_bytes());
-        let signature = self.sign(&encoded);
-        
-        Ok(format!("{}.{}.{}", "eyJhbGciOiJIUzI1NiJ9", encoded, signature))
+        self.create_token(&claims)
     }
     
     /// 签发刷新令牌
@@ -165,13 +160,7 @@ impl JwtService {
             self.config.refresh_expiry_hours,
         );
         
-        let payload = serde_json::to_string(&claims)
-            .map_err(|e| AuthError::InternalError(e.to_string()))?;
-        
-        let encoded = base64_encode(payload.as_bytes());
-        let signature = self.sign(&encoded);
-        
-        Ok(format!("{}.{}.{}", "eyJhbGciOiJIUzI1NiJ9", encoded, signature))
+        self.create_token(&claims)
     }
     
     /// 校验令牌
@@ -182,14 +171,17 @@ impl JwtService {
             return Err(AuthError::InvalidToken("Invalid token format".to_string()));
         }
         
-        // 验证签名
-        let expected_signature = self.sign(parts[1]);
-        if parts[2] != expected_signature {
-            return Err(AuthError::InvalidToken("Invalid signature".to_string()));
-        }
+        // 验证签名 (HMAC-SHA256)
+        let signing_input = format!("{}.{}", parts[0], parts[1]);
+        let signature_bytes = base64url_decode(parts[2])
+            .map_err(|e| AuthError::InvalidToken(format!("Invalid signature encoding: {}", e)))?;
+        
+        // Verify HMAC-SHA256 signature (constant-time comparison via ring)
+        hmac::verify(&self.hmac_key, signing_input.as_bytes(), &signature_bytes)
+            .map_err(|_| AuthError::InvalidToken("Invalid signature".to_string()))?;
         
         // 解码 payload
-        let payload = base64_decode(parts[1])
+        let payload = base64url_decode(parts[1])
             .map_err(|e| AuthError::InvalidToken(e))?;
         
         let claims: Claims = serde_json::from_slice(&payload)
@@ -228,26 +220,31 @@ impl JwtService {
         Ok((new_access_token, new_refresh_token))
     }
     
-    /// 签名数据
-    fn sign(&self, data: &str) -> String {
-        // 简化版本：使用 HMAC-SHA256
-        // 生产环境应使用 ring 或其他安全的加密库
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
+    /// 创建 JWT 令牌 (header.payload.signature)
+    fn create_token(&self, claims: &Claims) -> AuthResult<String> {
+        // JWT Header: {"alg":"HS256","typ":"JWT"}
+        let header = r#"{"alg":"HS256","typ":"JWT"}"#;
+        let header_encoded = base64url_encode(header.as_bytes());
         
-        let mut hasher = DefaultHasher::new();
-        data.hash(&mut hasher);
-        self.secret.hash(&mut hasher);
+        // Claims payload
+        let payload_json = serde_json::to_string(claims)
+            .map_err(|e| AuthError::InternalError(e.to_string()))?;
+        let payload_encoded = base64url_encode(payload_json.as_bytes());
         
-        format!("{:x}", hasher.finish())
+        // HMAC-SHA256 signature over "header.payload"
+        let signing_input = format!("{}.{}", header_encoded, payload_encoded);
+        let tag = hmac::sign(&self.hmac_key, signing_input.as_bytes());
+        let signature_encoded = base64url_encode(tag.as_ref());
+        
+        Ok(format!("{}.{}.{}", header_encoded, payload_encoded, signature_encoded))
     }
 }
 
-/// Base64 编码（简化版本）
-fn base64_encode(data: &[u8]) -> String {
-    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+/// Base64url 编码（JWT 标准：使用 URL-safe 字符集，无填充）
+fn base64url_encode(data: &[u8]) -> String {
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     
-    let mut result = String::new();
+    let mut result = String::with_capacity((data.len() * 4 + 2) / 3);
     for chunk in data.chunks(3) {
         let b0 = chunk[0] as u32;
         let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
@@ -260,35 +257,32 @@ fn base64_encode(data: &[u8]) -> String {
         
         if chunk.len() > 1 {
             result.push(ALPHABET[((triple >> 6) & 0x3F) as usize] as char);
-        } else {
-            result.push('=');
         }
-        
         if chunk.len() > 2 {
             result.push(ALPHABET[(triple & 0x3F) as usize] as char);
-        } else {
-            result.push('=');
         }
     }
     
     result
 }
 
-/// Base64 解码（简化版本）
-fn base64_decode(data: &str) -> Result<Vec<u8>, String> {
+/// Base64url 解码（JWT 标准：使用 URL-safe 字符集，无填充）
+fn base64url_decode(data: &str) -> Result<Vec<u8>, String> {
     use std::collections::HashMap;
     
-    let alphabet: HashMap<char, u8> = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    let alphabet: HashMap<char, u8> = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
         .chars()
         .enumerate()
         .map(|(i, c)| (c, i as u8))
         .collect();
     
-    let data = data.trim_end_matches('=');
-    let mut result = Vec::new();
-    
     let bytes: Vec<u8> = data.chars().filter_map(|c| alphabet.get(&c).copied()).collect();
     
+    if bytes.len() % 4 == 1 {
+        return Err("Invalid base64url string length".to_string());
+    }
+    
+    let mut result = Vec::with_capacity(bytes.len() * 3 / 4);
     for chunk in bytes.chunks(4) {
         if chunk.len() < 2 {
             continue;
@@ -337,6 +331,10 @@ mod tests {
         let token = service.sign_token("user1", Role::User).unwrap();
         assert!(!token.is_empty());
         
+        // 验证令牌格式 (header.payload.signature)
+        let parts: Vec<&str> = token.split('.').collect();
+        assert_eq!(parts.len(), 3, "Token should have 3 parts separated by dots");
+        
         // 校验令牌
         let claims = service.verify_token(&token).unwrap();
         assert_eq!(claims.sub, "user1");
@@ -359,11 +357,57 @@ mod tests {
     }
 
     #[test]
-    fn test_base64() {
-        let data = b"Hello, World!";
-        let encoded = base64_encode(data);
-        let decoded = base64_decode(&encoded).unwrap();
+    fn test_tampered_token_rejected() {
+        let config = JwtConfig::default();
+        let service = JwtService::new(config, "test-secret");
+
+        let token = service.sign_token("user1", Role::User).unwrap();
+
+        // Tamper with the payload (change last char of second part)
+        let parts: Vec<&str> = token.split('.').collect();
+        let mut payload_chars: Vec<char> = parts[1].chars().collect();
+        if let Some(last) = payload_chars.last_mut() {
+            *last = if *last == 'A' { 'B' } else { 'A' };
+        }
+        let modified_payload: String = payload_chars.iter().collect();
+
+        let tampered = format!("{}.{}.{}", parts[0], modified_payload, parts[2]);
+        assert!(service.verify_token(&tampered).is_err());
+    }
+
+    #[test]
+    fn test_wrong_secret_rejected() {
+        let config = JwtConfig::default();
+        let service = JwtService::new(config, "correct-secret");
+        let wrong_service = JwtService::new(JwtConfig::default(), "wrong-secret");
+        
+        let token = service.sign_token("user1", Role::User).unwrap();
+        assert!(wrong_service.verify_token(&token).is_err());
+    }
+
+    #[test]
+    fn test_base64url_roundtrip() {
+        let data = "Hello, World! 你好世界".as_bytes();
+        let encoded = base64url_encode(data);
+        let decoded = base64url_decode(&encoded).unwrap();
         
         assert_eq!(data.to_vec(), decoded);
+        
+        // Verify no standard base64 chars (+, /, =) appear
+        assert!(!encoded.contains('+'));
+        assert!(!encoded.contains('/'));
+        assert!(!encoded.contains('='));
+    }
+
+    #[test]
+    fn test_hmac_is_cryptographic() {
+        // Verify that the signature is HMAC-SHA256 (32 bytes = 256 bits)
+        let config = JwtConfig::default();
+        let service = JwtService::new(config, "test-secret");
+        let token = service.sign_token("user1", Role::User).unwrap();
+        
+        let parts: Vec<&str> = token.split('.').collect();
+        let signature = base64url_decode(parts[2]).unwrap();
+        assert_eq!(signature.len(), 32, "HMAC-SHA256 signature should be 32 bytes");
     }
 }

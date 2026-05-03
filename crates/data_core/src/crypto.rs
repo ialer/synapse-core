@@ -70,6 +70,8 @@ pub struct Cipher {
     key: aead::LessSafeKey,
     /// 随机数生成器
     rng: SystemRandom,
+    /// 原始密钥字节 (用于持久化)
+    key_bytes: Vec<u8>,
 }
 
 impl Cipher {
@@ -104,6 +106,7 @@ impl Cipher {
         Ok(Self {
             key: aead::LessSafeKey::new(key),
             rng,
+            key_bytes: key_bytes.to_vec(),
         })
     }
 
@@ -127,6 +130,7 @@ impl Cipher {
         Ok(Self {
             key: aead::LessSafeKey::new(key),
             rng: SystemRandom::new(),
+            key_bytes: key_bytes.to_vec(),
         })
     }
 
@@ -269,10 +273,7 @@ impl Cipher {
     /// 
     /// 此方法返回原始密钥，应安全存储。
     pub fn key_bytes(&self) -> Vec<u8> {
-        // 注意：ring 的 LessSafeKey 不直接暴露密钥
-        // 这里需要在创建时保存密钥副本
-        // 生产环境应使用安全的密钥存储
-        Vec::new() // 占位实现
+        self.key_bytes.clone()
     }
 }
 
@@ -371,5 +372,27 @@ mod tests {
         let decrypted = cipher.decrypt(&ciphertext, None).unwrap();
         
         assert_eq!(plaintext.to_vec(), decrypted);
+    }
+
+    #[test]
+    fn test_key_bytes_returns_non_empty() {
+        let cipher = Cipher::new().unwrap();
+        let kb = cipher.key_bytes();
+        assert_eq!(kb.len(), Cipher::KEY_LENGTH);
+        assert!(!kb.is_empty());
+
+        // Verify round-trip: reconstruct cipher from key_bytes
+        let cipher2 = Cipher::with_key(&kb).unwrap();
+        let plaintext = b"persistence test";
+        let ciphertext = cipher2.encrypt(plaintext, None).unwrap();
+        let decrypted = cipher.decrypt(&ciphertext, None).unwrap();
+        assert_eq!(plaintext.to_vec(), decrypted);
+    }
+
+    #[test]
+    fn test_key_bytes_from_password() {
+        let cipher = Cipher::from_password(b"pass", b"saltsalt").unwrap();
+        let kb = cipher.key_bytes();
+        assert_eq!(kb.len(), Cipher::KEY_LENGTH);
     }
 }

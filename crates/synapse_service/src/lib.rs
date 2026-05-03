@@ -95,15 +95,15 @@ pub struct SynapseApp {
     /// 通知管理器
     notification_manager: NotificationManager,
     
-    /// 数据存储（内存版本）
-    pub data_store: HashMap<String, DataEntity>,
+    /// 数据存储（内存版本，内部使用）
+    data_store: HashMap<String, DataEntity>,
 }
 
 impl SynapseApp {
     /// 创建新的 SynapseApp（本地存储）
-    pub fn new_local(storage_path: &str) -> SynapseResult<Self> {
+    pub async fn new_local(storage_path: &str) -> SynapseResult<Self> {
         let jwt_config = JwtConfig::default();
-        let auth = Box::new(DiskAuthService::new(jwt_config, "synapse-secret-key", storage_path));
+        let auth = Box::new(DiskAuthService::new(jwt_config, "synapse-secret-key", storage_path).await);
         let storage = Box::new(LocalBackend::new(storage_path));
         let cipher = Cipher::new()?;
         
@@ -493,7 +493,46 @@ impl SynapseApp {
     pub async fn verify_token(&self, token: &str) -> Result<iam_core::Claims, iam_core::AuthError> {
         self.auth.verify_token(token).await
     }
-    
+
+    /// 列出所有数据的基本信息（不含加密内容）
+    pub fn list_all_data(&self) -> Vec<DataItemInfo> {
+        self.data_store
+            .values()
+            .map(|entity| DataItemInfo {
+                id: entity.id.to_string(),
+                data_type: entity.data_type.to_string(),
+                tags: entity.tags.clone(),
+                created_at: entity.created_at.to_rfc3339(),
+            })
+            .collect()
+    }
+
+    /// 获取数据总数
+    pub fn get_data_count(&self) -> usize {
+        self.data_store.len()
+    }
+
+    /// 获取数据实体（内部使用）
+    pub(crate) fn get_data_item(&self, id: &str) -> Option<&DataEntity> {
+        self.data_store.get(id)
+    }
+
+    /// 按标签搜索数据（返回基本信息，不含加密内容）
+    pub fn search_by_tag(&self, tag: &str, limit: usize) -> Vec<DataItemInfo> {
+        let tag_lower = tag.to_lowercase();
+        self.data_store
+            .values()
+            .filter(|e| e.tags.iter().any(|t| t.to_lowercase().contains(&tag_lower)))
+            .take(limit)
+            .map(|entity| DataItemInfo {
+                id: entity.id.to_string(),
+                data_type: entity.data_type.to_string(),
+                tags: entity.tags.clone(),
+                created_at: entity.created_at.to_rfc3339(),
+            })
+            .collect()
+    }
+
     /// 获取统计信息
     pub fn stats(&self) -> ServiceStats {
         ServiceStats {
@@ -515,6 +554,19 @@ pub struct ServiceStats {
     
     /// 消息数量
     pub message_count: usize,
+}
+
+/// 基本数据条目信息（不含加密内容）
+#[derive(Debug, Clone)]
+pub struct DataItemInfo {
+    /// 数据 ID
+    pub id: String,
+    /// 数据类型
+    pub data_type: String,
+    /// 标签
+    pub tags: Vec<String>,
+    /// 创建时间
+    pub created_at: String,
 }
 
 /// 服务 Trait
@@ -541,7 +593,7 @@ mod tests {
     #[tokio::test]
     async fn test_synapse_app_creation() {
         let temp_dir = TempDir::new().unwrap();
-        let app = SynapseApp::new_local(temp_dir.path().to_str().unwrap()).unwrap();
+        let app = SynapseApp::new_local(temp_dir.path().to_str().unwrap()).await.unwrap();
         
         let stats = app.stats();
         assert_eq!(stats.data_count, 0);
@@ -550,7 +602,7 @@ mod tests {
     #[tokio::test]
     async fn test_search() {
         let temp_dir = TempDir::new().unwrap();
-        let mut app = SynapseApp::new_local(temp_dir.path().to_str().unwrap()).unwrap();
+        let mut app = SynapseApp::new_local(temp_dir.path().to_str().unwrap()).await.unwrap();
         
         let entry = search_indexer::IndexEntry {
             id: "1".to_string(),
@@ -568,7 +620,7 @@ mod tests {
     #[tokio::test]
     async fn test_stats() {
         let temp_dir = TempDir::new().unwrap();
-        let mut app = SynapseApp::new_local(temp_dir.path().to_str().unwrap()).unwrap();
+        let mut app = SynapseApp::new_local(temp_dir.path().to_str().unwrap()).await.unwrap();
         
         let entry = search_indexer::IndexEntry {
             id: "1".to_string(),

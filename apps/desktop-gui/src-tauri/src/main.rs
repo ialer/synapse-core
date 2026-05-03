@@ -146,12 +146,12 @@ async fn list_data(state: State<'_, AppState>, token: String) -> Result<Vec<Data
     // 验证 token
     app.verify_token(&token).await.map_err(|e| e.to_string())?;
 
-    let items: Vec<DataItemInfo> = app.data_store.values().map(|entity| {
+    let items: Vec<DataItemInfo> = app.list_all_data().into_iter().map(|info| {
         DataItemInfo {
-            id: entity.id.to_string(),
-            data_type: entity.data_type.as_str().to_string(),
-            tags: entity.tags.clone(),
-            created_at: entity.created_at.to_rfc3339(),
+            id: info.id,
+            data_type: info.data_type,
+            tags: info.tags,
+            created_at: info.created_at,
         }
     }).collect();
 
@@ -240,13 +240,14 @@ struct StorageInfo {
 }
 
 fn main() {
-    // Create app first
-    let mut app = SynapseApp::new_local("/tmp/synapse-data")
-        .expect("Failed to create SynapseApp");
-
     // Initialize from disk: load data_store and indexer
     let rt = tokio::runtime::Runtime::new()
         .expect("Failed to create Tokio runtime for init");
+
+    // Create app (async now, since DiskAuthService::new is async)
+    let mut app = rt.block_on(SynapseApp::new_local("/tmp/synapse-data"))
+        .expect("Failed to create SynapseApp");
+
     rt.block_on(app.init())
         .expect("Failed to initialize SynapseApp from disk");
 

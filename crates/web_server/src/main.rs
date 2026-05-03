@@ -313,13 +313,13 @@ async fn list_data(
     }
 
     let all_items: Vec<DataItemResponse> = app
-        .data_store
-        .values()
-        .map(|e| DataItemResponse {
-            id: e.id.to_string(),
-            data_type: e.data_type.to_string(),
-            tags: e.tags.clone(),
-            created_at: e.created_at.to_rfc3339(),
+        .list_all_data()
+        .into_iter()
+        .map(|info| DataItemResponse {
+            id: info.id,
+            data_type: info.data_type,
+            tags: info.tags,
+            created_at: info.created_at,
         })
         .collect();
 
@@ -375,24 +375,18 @@ async fn search(
 ) -> Json<Vec<SearchItemResponse>> {
     let app = state.app.lock().await;
 
-    // If tag filter is provided, filter from data_store by tags
+    // If tag filter is provided, search by tag via proper accessor
     if let Some(ref tag) = q.tag {
-        let tag_lower = tag.to_lowercase();
         let items: Vec<SearchItemResponse> = app
-            .data_store
-            .values()
-            .filter(|e| e.tags.iter().any(|t| t.to_lowercase().contains(&tag_lower)))
-            .take(q.limit)
-            .map(|e| {
-                let content = String::from_utf8_lossy(&e.encrypted_content).to_string();
-                SearchItemResponse {
-                    id: e.id.to_string(),
-                    content,
-                    metadata: HashMap::from([
-                        ("type".to_string(), e.data_type.to_string()),
-                        ("tags".to_string(), e.tags.join(",")),
-                    ]),
-                }
+            .search_by_tag(tag, q.limit)
+            .into_iter()
+            .map(|info| SearchItemResponse {
+                id: info.id,
+                content: String::new(),
+                metadata: HashMap::from([
+                    ("type".to_string(), info.data_type),
+                    ("tags".to_string(), info.tags.join(",")),
+                ]),
             })
             .collect();
         return Json(items);
@@ -464,7 +458,7 @@ async fn main() -> anyhow::Result<()> {
     println!("╚══════════════════════════════════════════╝");
 
     // Create SynapseApp with local storage
-    let mut app = SynapseApp::new_local("./data")?;
+    let mut app = SynapseApp::new_local("./data").await?;
     app.init().await?;
     println!("[web] Application initialized, loading from ./data");
 

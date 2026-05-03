@@ -4,6 +4,9 @@
 
 use std::path::PathBuf;
 
+use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
+use rand_core::OsRng;
+use argon2::Argon2;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
@@ -110,12 +113,18 @@ impl MemoryAuthService {
         }
     }
     
-    /// 添加用户
+    /// 添加用户（使用 Argon2 哈希密码）
     pub fn add_user(&self, username: &str, password: &str, role: Role) {
+        let salt = SaltString::generate(&mut OsRng);
+        let password_hash = Argon2::default()
+            .hash_password(password.as_bytes(), &salt)
+            .expect("Failed to hash password with Argon2")
+            .to_string();
+
         let user = UserRecord {
             id: uuid::Uuid::new_v4().to_string(),
             username: username.to_string(),
-            password_hash: password.to_string(), // 简化版本，生产环境应使用 bcrypt
+            password_hash,
             role,
             enabled: true,
         };
@@ -153,7 +162,14 @@ impl AuthService for MemoryAuthService {
             return Err(crate::error::AuthError::UserDisabled(username.to_string()));
         }
         
-        if user.password_hash != password {
+        // 使用 Argon2 验证密码
+        let parsed_hash = PasswordHash::new(&user.password_hash)
+            .map_err(|_| crate::error::AuthError::InvalidCredentials)?;
+        
+        if Argon2::default()
+            .verify_password(password.as_bytes(), &parsed_hash)
+            .is_err()
+        {
             return Err(crate::error::AuthError::InvalidCredentials);
         }
         
@@ -234,13 +250,13 @@ impl DiskAuthService {
     /// 创建新的磁盘认证服务
     /// 
     /// 从 `{storage_path}/users.json` 加载已有的用户数据（如果文件存在）。
-    pub fn new(jwt_config: JwtConfig, secret: impl Into<String>, storage_path: &str) -> Self {
+    pub async fn new(jwt_config: JwtConfig, secret: impl Into<String>, storage_path: &str) -> Self {
         let users_file = PathBuf::from(storage_path).join("users.json");
         let inner = MemoryAuthService::new(jwt_config, secret);
         
-        // 尝试从文件加载用户数据
+        // 尝试从文件加载用户数据（异步读取）
         if users_file.exists() {
-            match Self::load_users_from_file(&users_file) {
+            match Self::load_users_from_file(&users_file).await {
                 Ok(users) => {
                     inner.load_users(users);
                 }
@@ -256,33 +272,33 @@ impl DiskAuthService {
         }
     }
     
-    /// 从文件加载用户数据
-    fn load_users_from_file(path: &PathBuf) -> Result<Vec<UserRecord>, Box<dyn std::error::Error>> {
-        let data = std::fs::read_to_string(path)?;
+    /// 从文件加载用户数据（异步）
+    async fn load_users_from_file(path: &PathBuf) -> Result<Vec<UserRecord>, Box<dyn std::error::Error + Send + Sync>> {
+        let data = tokio::fs::read_to_string(path).await?;
         let users: Vec<UserRecord> = serde_json::from_str(&data)?;
         Ok(users)
     }
     
-    /// 保存用户数据到文件
-    fn save_users_to_file(&self) -> Result<(), Box<dyn std::error::Error>> {
+    /// 保存用户数据到文件（异步）
+    async fn save_users_to_file(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let users = self.inner.get_users();
         let json = serde_json::to_string_pretty(&users)?;
         
-        // 确保父目录存在
+        // 确保父目录存在（异步）
         if let Some(parent) = self.users_file.parent() {
-            std::fs::create_dir_all(parent)?;
+            tokio::fs::create_dir_all(parent).await?;
         }
         
-        std::fs::write(&self.users_file, json)?;
+        tokio::fs::write(&self.users_file, json).await?;
         Ok(())
     }
     
-    /// 添加用户并持久化
-    pub fn add_user(&self, username: &str, password: &str, role: Role) {
+    /// 添加用户并持久化（异步）
+    pub async fn add_user(&self, username: &str, password: &str, role: Role) {
         self.inner.add_user(username, password, role);
         
-        // 保存到磁盘
-        if let Err(e) = self.save_users_to_file() {
+        // 异步保存到磁盘
+        if let Err(e) = self.save_users_to_file().await {
             eprintln!("[disk_auth] 保存用户数据失败: {}", e);
         }
     }
@@ -323,8 +339,8 @@ impl AuthService for DiskAuthService {
         // 先注册
         let result = self.inner.register(username, password).await?;
         
-        // 注册成功后保存到磁盘
-        if let Err(e) = self.save_users_to_file() {
+        // 注册成功后异步保存到磁盘
+        if let Err(e) = self.save_users_to_file().await {
             eprintln!("[disk_auth] 注册后保存用户数据失败: {}", e);
         }
         
@@ -369,5 +385,28 @@ mod tests {
         let claims = service.verify_token(&login_result.access_token).await.unwrap();
         
         assert_eq!(claims.sub, login_result.user_id);
+    }
+
+    #[tokio::test]
+    async fn test_disk_auth_service() {
+        let temp_dir = std::env::temp_dir().join(format!("iam_core_test_{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        
+        let config = JwtConfig::default();
+        let service = DiskAuthService::new(config, "test-secret", temp_dir.to_str().unwrap()).await;
+        
+        // 添加用户并异步持久化
+        service.add_user("admin", "admin123", Role::Admin).await;
+        
+        // 验证登录（argon2 验证）
+        let result = service.login("admin", "admin123").await.unwrap();
+        assert_eq!(result.role, Role::Admin);
+        
+        // 验证密码错误
+        let result = service.login("admin", "wrongpassword").await;
+        assert!(result.is_err());
+        
+        // 清理
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }
