@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use data_core::{DataId, OwnerId, PermissionLevel};
+use messaging_service::{Message, MessageType, MessagePriority};
 
 /// 共享请求状态
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -137,6 +138,121 @@ impl ShareManager {
             }
         }
         false
+    }
+
+    /// 创建共享请求并发送通知消息给接收者
+    ///
+    /// 创建一个 ShareRequest 并为接收者生成一个 Notification 类型的消息。
+    /// 返回 (ShareRequest, Message) 元组。
+    pub fn create_share_request_with_message(
+        &mut self,
+        data_id: DataId,
+        from: OwnerId,
+        to: OwnerId,
+        level: PermissionLevel,
+        message_text: Option<String>,
+    ) -> (ShareRequest, Message) {
+        let request = self.request_share(data_id, from, to, level, message_text.clone());
+
+        let title = format!("共享请求 - {}", data_id);
+        let content = message_text.unwrap_or_else(|| {
+            format!(
+                "用户 {} 请求以 {:?} 权限访问数据 {}",
+                from, level, data_id
+            )
+        });
+
+        let notification = Message::new(
+            from.to_string(),
+            to.to_string(),
+            title,
+            content,
+        )
+        .with_type(MessageType::Notification)
+        .with_priority(MessagePriority::Normal);
+
+        (request, notification)
+    }
+
+    /// 响应共享请求（批准或拒绝）并生成通知消息
+    ///
+    /// 如果 approved 为 true，则批准请求并创建审批通过的通知消息；
+    /// 如果 approved 为 false，则拒绝请求并创建拒绝通知消息。
+    /// 返回 (Option<ShareGrant>, Message) 元组。
+    pub fn respond_to_request(
+        &mut self,
+        request_id: &Uuid,
+        approved: bool,
+        responder_id: OwnerId,
+    ) -> (Option<ShareGrant>, Message) {
+        if approved {
+            let grant = self.approve_request(request_id, None);
+            let (title, content) = if grant.is_some() {
+                (
+                    "共享请求已批准".to_string(),
+                    "您的共享请求已被批准。您现在拥有对数据的访问权限。".to_string(),
+                )
+            } else {
+                (
+                    "共享请求处理失败".to_string(),
+                    "共享请求处理失败，请求可能不存在或已被处理。".to_string(),
+                )
+            };
+
+            let request = self
+                .requests
+                .iter()
+                .find(|r| r.id == *request_id)
+                .cloned();
+            let recipient_id = request
+                .map(|r| r.from_user.to_string())
+                .unwrap_or_else(|| "unknown".to_string());
+
+            let notification = Message::new(
+                responder_id.to_string(),
+                recipient_id,
+                title,
+                content,
+            )
+            .with_type(MessageType::Notification)
+            .with_priority(MessagePriority::Normal);
+
+            (grant, notification)
+        } else {
+            let success = self.deny_request(request_id);
+
+            let (title, content) = if success {
+                (
+                    "共享请求已拒绝".to_string(),
+                    "您的共享请求已被拒绝。".to_string(),
+                )
+            } else {
+                (
+                    "共享请求处理失败".to_string(),
+                    "共享请求处理失败，请求可能不存在或已被处理。".to_string(),
+                )
+            };
+
+            let request = self
+                .requests
+                .iter()
+                .find(|r| r.id == *request_id)
+                .cloned();
+            let recipient_id = request
+                .map(|r| r.from_user.to_string())
+                .unwrap_or_else(|| "unknown".to_string());
+
+            let notification = Message::new(
+                responder_id.to_string(),
+                recipient_id,
+                title,
+                content,
+            )
+            .with_type(MessageType::Notification)
+            .with_priority(MessagePriority::Normal);
+
+            (None, notification)
+        }
     }
 
     /// 检查用户对数据的权限
@@ -544,5 +660,223 @@ mod tests {
         let mut mgr = ShareManager::new();
         let fake_id = Uuid::new_v4();
         assert!(!mgr.deny_request(&fake_id));
+    }
+
+    #[test]
+    fn test_create_share_request_with_message() {
+        let mut mgr = ShareManager::new();
+        let data_id = Uuid::new_v4();
+        let from = Uuid::new_v4();
+        let to = Uuid::new_v4();
+
+        let (request, notification) = mgr.create_share_request_with_message(
+            data_id,
+            from,
+            to,
+            PermissionLevel::View,
+            Some("请共享数据".to_string()),
+        );
+
+        // Verify the request
+        assert_eq!(request.status, ShareRequestStatus::Pending);
+        assert_eq!(request.from_user, from);
+        assert_eq!(request.to_user, to);
+        assert_eq!(request.data_id, data_id);
+        assert_eq!(request.requested_level, PermissionLevel::View);
+
+        // Verify the notification message
+        assert_eq!(notification.sender_id, from.to_string());
+        assert_eq!(notification.recipient_id, to.to_string());
+        assert!(notification.title.contains(&data_id.to_string()));
+        assert_eq!(notification.content, "请共享数据");
+        assert!(matches!(notification.message_type, MessageType::Notification));
+        assert!(matches!(
+            notification.priority,
+            MessagePriority::Normal
+        ));
+        assert!(!notification.is_read());
+    }
+
+    #[test]
+    fn test_create_share_request_with_message_default_content() {
+        let mut mgr = ShareManager::new();
+        let data_id = Uuid::new_v4();
+        let from = Uuid::new_v4();
+        let to = Uuid::new_v4();
+
+        let (_request, notification) = mgr.create_share_request_with_message(
+            data_id,
+            from,
+            to,
+            PermissionLevel::Edit,
+            None,
+        );
+
+        // When no custom message, default content should contain from user and level
+        assert!(notification.content.contains(&from.to_string()));
+        assert!(notification.content.contains("Edit"));
+    }
+
+    #[test]
+    fn test_respond_to_request_approve() {
+        let mut mgr = ShareManager::new();
+        let data_id = Uuid::new_v4();
+        let requester = Uuid::new_v4();
+        let owner = Uuid::new_v4();
+
+        let req = mgr.request_share(
+            data_id,
+            requester,
+            owner,
+            PermissionLevel::View,
+            None,
+        );
+
+        let (grant, notification) = mgr.respond_to_request(&req.id, true, owner);
+
+        // Verify the grant was created
+        let grant = grant.expect("grant should be created");
+        assert_eq!(grant.data_id, data_id);
+        assert_eq!(grant.owner_id, owner);
+        assert_eq!(grant.grantee_id, requester);
+        assert!(grant.is_active);
+
+        // Verify the approval notification
+        assert_eq!(notification.sender_id, owner.to_string());
+        assert_eq!(notification.recipient_id, requester.to_string());
+        assert!(notification.title.contains("批准"));
+        assert!(notification.content.contains("批准"));
+        assert!(matches!(notification.message_type, MessageType::Notification));
+    }
+
+    #[test]
+    fn test_respond_to_request_deny() {
+        let mut mgr = ShareManager::new();
+        let data_id = Uuid::new_v4();
+        let requester = Uuid::new_v4();
+        let owner = Uuid::new_v4();
+
+        let req = mgr.request_share(
+            data_id,
+            requester,
+            owner,
+            PermissionLevel::View,
+            None,
+        );
+
+        let (grant, notification) = mgr.respond_to_request(&req.id, false, owner);
+
+        // Verify no grant was created
+        assert!(grant.is_none());
+
+        // Verify the request was denied
+        let updated_req = mgr.requests.iter().find(|r| r.id == req.id).unwrap();
+        assert_eq!(updated_req.status, ShareRequestStatus::Denied);
+
+        // Verify the denial notification
+        assert_eq!(notification.sender_id, owner.to_string());
+        assert_eq!(notification.recipient_id, requester.to_string());
+        assert!(notification.title.contains("拒绝"));
+        assert!(notification.content.contains("拒绝"));
+        assert!(matches!(notification.message_type, MessageType::Notification));
+    }
+
+    #[test]
+    fn test_respond_to_request_approve_nonexistent() {
+        let mut mgr = ShareManager::new();
+        let owner = Uuid::new_v4();
+        let fake_id = Uuid::new_v4();
+
+        let (grant, notification) = mgr.respond_to_request(&fake_id, true, owner);
+
+        assert!(grant.is_none());
+        assert!(notification.title.contains("失败"));
+    }
+
+    #[test]
+    fn test_respond_to_request_deny_nonexistent() {
+        let mut mgr = ShareManager::new();
+        let owner = Uuid::new_v4();
+        let fake_id = Uuid::new_v4();
+
+        let (grant, notification) = mgr.respond_to_request(&fake_id, false, owner);
+
+        assert!(grant.is_none());
+        assert!(notification.title.contains("失败"));
+    }
+
+    #[test]
+    fn test_full_sharing_flow_with_messages() {
+        let mut mgr = ShareManager::new();
+        let data_id = Uuid::new_v4();
+        let requester = Uuid::new_v4();
+        let owner = Uuid::new_v4();
+
+        // Step 1: Requester creates share request with notification
+        let (req, request_msg) = mgr.create_share_request_with_message(
+            data_id,
+            requester,
+            owner,
+            PermissionLevel::Edit,
+            Some("我需要编辑权限".to_string()),
+        );
+
+        assert_eq!(req.status, ShareRequestStatus::Pending);
+        assert_eq!(request_msg.sender_id, requester.to_string());
+        assert_eq!(request_msg.recipient_id, owner.to_string());
+        assert!(request_msg.content.contains("我需要编辑权限"));
+
+        // Step 2: Owner approves the request
+        let (grant, approval_msg) = mgr.respond_to_request(&req.id, true, owner);
+
+        let grant = grant.expect("grant should be created");
+        assert!(grant.is_active);
+        assert_eq!(grant.level, PermissionLevel::Edit);
+        assert_eq!(approval_msg.sender_id, owner.to_string());
+        assert_eq!(approval_msg.recipient_id, requester.to_string());
+
+        // Step 3: Verify requester now has permission
+        assert!(mgr.check_permission(&data_id, &requester, PermissionLevel::View));
+        assert!(mgr.check_permission(&data_id, &requester, PermissionLevel::Edit));
+
+        // Step 4: Owner revokes the grant
+        let revoked = mgr.revoke_grant(&grant.id);
+        assert!(revoked);
+        assert!(!mgr.check_permission(&data_id, &requester, PermissionLevel::View));
+    }
+
+    #[test]
+    fn test_full_deny_flow_with_messages() {
+        let mut mgr = ShareManager::new();
+        let data_id = Uuid::new_v4();
+        let requester = Uuid::new_v4();
+        let owner = Uuid::new_v4();
+
+        // Step 1: Requester creates share request
+        let (req, _request_msg) = mgr.create_share_request_with_message(
+            data_id,
+            requester,
+            owner,
+            PermissionLevel::Admin,
+            None,
+        );
+
+        assert_eq!(req.status, ShareRequestStatus::Pending);
+
+        // Step 2: Owner denies the request
+        let (grant, denial_msg) = mgr.respond_to_request(&req.id, false, owner);
+
+        assert!(grant.is_none());
+        assert_eq!(denial_msg.sender_id, owner.to_string());
+        assert_eq!(denial_msg.recipient_id, requester.to_string());
+        assert!(denial_msg.title.contains("拒绝"));
+
+        // Step 3: Verify requester has no permission
+        assert!(!mgr.check_permission(&data_id, &requester, PermissionLevel::View));
+        assert!(!mgr.check_permission(&data_id, &requester, PermissionLevel::Admin));
+
+        // Step 4: Verify request is in Denied state
+        let updated = mgr.requests.iter().find(|r| r.id == req.id).unwrap();
+        assert_eq!(updated.status, ShareRequestStatus::Denied);
     }
 }
