@@ -3,6 +3,8 @@
 //! 整合 IAM、Storage 和 Data 核心，对外提供统一的 API 接口。
 
 pub mod error;
+pub mod sharing;
+pub mod pipeline;
 
 use std::collections::HashMap;
 use async_trait::async_trait;
