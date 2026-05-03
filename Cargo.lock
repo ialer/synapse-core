@@ -1556,6 +1556,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "synapse-connect"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "data_core",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "synapse-core"
 version = "0.1.0"
 dependencies = [

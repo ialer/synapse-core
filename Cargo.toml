@@ -30,6 +30,7 @@ members = [
     "crates/agent_interface",
     "crates/messaging_service",
     "crates/synapse_service",
+    "crates/synapse-connect",
     "crates/web_server",
 ]
 exclude = [

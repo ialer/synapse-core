@@ -1,0 +1,16 @@
+[package]
+name = "synapse-connect"
+version.workspace = true
+edition.workspace = true
+description = "数据源连接器 - Provider 插件系统"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+data_core = { path = "../data_core" }
+
+[dev-dependencies]
+tempfile = "3"

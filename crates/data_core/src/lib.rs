@@ -15,6 +15,6 @@ pub mod error;
 pub mod metadata;
 
 pub use crypto::{Cipher, CipherError};
-pub use entity::{DataEntity, DataType, DataId, OwnerId};
+pub use entity::{DataEntity, DataType, DataId, OwnerId, PermissionLevel, SharePermission};
 pub use error::DataError;
 pub use metadata::{Metadata, MetadataBuilder};
