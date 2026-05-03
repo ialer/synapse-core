@@ -433,10 +433,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/stats", get(stats))
         .route("/api/data", post(store_data))
         .route("/api/data/list", get(list_data))
-        .route("/api/data/{id}", get(get_data).put(update_data).delete(delete_data))
+        .route("/api/data/:id", get(get_data).put(update_data).delete(delete_data))
         .route("/api/search", get(search))
         .route("/api/messages", post(send_message))
-        .route("/api/messages/{user_id}", get(get_messages));
+        .route("/api/messages/:user_id", get(get_messages));
 
     // Try to serve the Vue frontend from dist/ directory
     let dist_path = std::path::Path::new("dist");

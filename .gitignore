@@ -44,3 +44,5 @@ docs/html/
 # 性能分析
 perf.data*
 flamegraph.svg
+data/
+*.json
