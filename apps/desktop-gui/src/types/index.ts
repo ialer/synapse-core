@@ -86,6 +86,43 @@ export interface DataItemInfo {
   created_at: string
 }
 
+/** 分享请求状态 */
+export type ShareStatus = 'pending' | 'approved' | 'denied' | 'revoked'
+
+/** 分享请求 */
+export interface ShareRequest {
+  id: string
+  data_id: string
+  data_title: string
+  sender_id: string
+  sender_name: string
+  recipient_id: string
+  recipient_name: string
+  status: ShareStatus
+  permission: 'read' | 'write'
+  created_at: string
+  updated_at: string
+  message?: string
+}
+
+/** 系统健康状态 */
+export interface HealthStatus {
+  status: 'healthy' | 'degraded' | 'down'
+  uptime: number
+  last_check: string
+  storage_backend: string
+  version: string
+}
+
+/** 文件夹树节点 */
+export interface FolderNode {
+  id: string
+  name: string
+  type: 'folder' | 'file'
+  children?: FolderNode[]
+  data_type?: string
+}
+
 /** 存储信息 */
 export interface StorageInfo {
   backend_type: string

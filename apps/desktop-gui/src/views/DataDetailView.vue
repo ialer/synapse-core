@@ -2,11 +2,11 @@
   <div class="data-detail-view">
     <div class="page-header">
       <div>
-        <h1 class="page-title">📄 数据详情</h1>
-        <p class="page-subtitle">查看和编辑数据条目</p>
+        <h1 class="page-title">📄 Data Detail</h1>
+        <p class="page-subtitle">View and edit data item</p>
       </div>
       <router-link to="/data" class="btn btn-secondary">
-        ← 返回列表
+        ← Back to Data
       </router-link>
     </div>
 
@@ -17,7 +17,7 @@
       @dismiss="statusMsg = ''"
     />
 
-    <LoadingSpinner v-if="loading" text="加载数据..." />
+    <LoadingSpinner v-if="loading" text="Loading data..." />
 
     <template v-else-if="item">
       <div class="card">
@@ -28,42 +28,42 @@
           </div>
           <div class="detail-actions">
             <button v-if="!editing" class="btn btn-secondary btn-sm" @click="startEdit">
-              ✏️ 编辑
+              ✏️ Edit
             </button>
             <button v-if="editing" class="btn btn-primary btn-sm" @click="saveEdit" :disabled="saving">
-              {{ saving ? '保存中...' : '💾 保存' }}
+              {{ saving ? 'Saving...' : '💾 Save' }}
             </button>
             <button v-if="editing" class="btn btn-secondary btn-sm" @click="cancelEdit">
-              取消
+              Cancel
             </button>
             <button class="btn btn-danger btn-sm" @click="confirmDelete">
-              🗑️ 删除
+              🗑️ Delete
             </button>
           </div>
         </div>
 
-        <!-- 查看模式 -->
+        <!-- View Mode -->
         <div v-if="!editing" class="detail-content">
           <div class="detail-section">
-            <h4 class="detail-section-title">内容</h4>
+            <h4 class="detail-section-title">Content</h4>
             <pre class="detail-pre">{{ item.content }}</pre>
           </div>
           <div v-if="item.tags?.length" class="detail-section">
-            <h4 class="detail-section-title">标签</h4>
+            <h4 class="detail-section-title">Tags</h4>
             <div class="detail-tags">
               <span v-for="tag in item.tags" :key="tag" class="tag">{{ tag }}</span>
             </div>
           </div>
           <div v-if="item.created_at" class="detail-section">
-            <h4 class="detail-section-title">创建时间</h4>
+            <h4 class="detail-section-title">Created</h4>
             <span class="detail-meta">{{ item.created_at }}</span>
           </div>
         </div>
 
-        <!-- 编辑模式 -->
+        <!-- Edit Mode -->
         <div v-else class="detail-content">
           <div class="form-group">
-            <label class="form-label">类型</label>
+            <label class="form-label">Type</label>
             <select v-model="editForm.dataType" class="form-select">
               <option v-for="opt in DATA_TYPE_OPTIONS" :key="opt.value" :value="opt.value">
                 {{ opt.icon }} {{ opt.label }}
@@ -71,7 +71,7 @@
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">内容</label>
+            <label class="form-label">Content</label>
             <textarea
               v-model="editForm.content"
               class="form-textarea"
@@ -79,7 +79,7 @@
             ></textarea>
           </div>
           <div class="form-group">
-            <label class="form-label">标签 (逗号分隔)</label>
+            <label class="form-label">Tags (comma separated)</label>
             <input
               v-model="editForm.tags"
               class="form-input"
@@ -92,24 +92,24 @@
 
     <div v-else class="empty-state">
       <div class="empty-state-icon">❓</div>
-      <div class="empty-state-text">数据不存在</div>
-      <router-link to="/data" class="btn btn-primary">返回列表</router-link>
+      <div class="empty-state-text">Data item not found</div>
+      <router-link to="/data" class="btn btn-primary">Back to Data</router-link>
     </div>
 
-    <!-- 删除确认对话框 -->
+    <!-- Delete Confirmation Dialog -->
     <div v-if="showDeleteConfirm" class="modal-overlay" @click.self="showDeleteConfirm = false">
       <div class="modal">
         <div class="modal-header">
-          <h3 class="modal-title">确认删除</h3>
+          <h3 class="modal-title">Confirm Delete</h3>
           <button class="btn btn-ghost btn-sm" @click="showDeleteConfirm = false">✕</button>
         </div>
         <div class="modal-body">
-          <p>确定要删除这条数据吗？此操作不可撤销。</p>
+          <p>Are you sure you want to delete this data item? This action cannot be undone.</p>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" @click="showDeleteConfirm = false">取消</button>
+          <button class="btn btn-secondary" @click="showDeleteConfirm = false">Cancel</button>
           <button class="btn btn-danger" @click="handleDelete" :disabled="deleting">
-            {{ deleting ? '删除中...' : '确认删除' }}
+            {{ deleting ? 'Deleting...' : 'Confirm Delete' }}
           </button>
         </div>
       </div>
@@ -148,9 +148,9 @@ const dataId = computed(() => route.params.id as string)
 
 const getTypeLabel = (type: DataType) => {
   const labels: Record<DataType, string> = {
-    credential: '凭证', config: '配置', file: '文件', contact: '联系人', generic: '通用',
+    credential: 'Credential', config: 'Config', file: 'File', contact: 'Contact', generic: 'Generic',
   }
-  return labels[type] || '未知'
+  return labels[type] || 'Unknown'
 }
 
 const loadItem = async () => {
@@ -165,7 +165,7 @@ const loadItem = async () => {
     }
   } catch (e) {
     statusType.value = 'error'
-    statusMsg.value = `加载失败: ${e}`
+    statusMsg.value = `Failed to load: ${e}`
   } finally {
     loading.value = false
   }
@@ -203,10 +203,10 @@ const saveEdit = async () => {
 
     editing.value = false
     statusType.value = 'success'
-    statusMsg.value = '数据已更新'
+    statusMsg.value = 'Data updated successfully'
   } catch (e) {
     statusType.value = 'error'
-    statusMsg.value = `更新失败: ${e}`
+    statusMsg.value = `Update failed: ${e}`
   } finally {
     saving.value = false
   }
@@ -221,12 +221,12 @@ const handleDelete = async () => {
   try {
     await deleteData('demo-token', dataId.value)
     statusType.value = 'success'
-    statusMsg.value = '数据已删除'
+    statusMsg.value = 'Data deleted successfully'
     showDeleteConfirm.value = false
     setTimeout(() => router.push('/data'), 1000)
   } catch (e) {
     statusType.value = 'error'
-    statusMsg.value = `删除失败: ${e}`
+    statusMsg.value = `Delete failed: ${e}`
   } finally {
     deleting.value = false
   }

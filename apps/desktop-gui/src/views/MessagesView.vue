@@ -2,11 +2,11 @@
   <div class="messages-view">
     <div class="page-header">
       <div>
-        <h1 class="page-title">💬 消息</h1>
-        <p class="page-subtitle">查看和发送消息</p>
+        <h1 class="page-title">💬 Messages</h1>
+        <p class="page-subtitle">View and send messages</p>
       </div>
       <button class="btn btn-primary" @click="showCompose = true">
-        ✉️ 写消息
+        ✉️ Compose
       </button>
     </div>
 
@@ -17,21 +17,21 @@
       @dismiss="statusMsg = ''"
     />
 
-    <!-- 搜索 -->
+    <!-- Search -->
     <div class="card" style="margin-bottom: 16px">
       <SearchBar
         v-model="searchQuery"
-        placeholder="搜索消息..."
+        placeholder="Search messages..."
         @search="handleSearch"
       />
     </div>
 
-    <!-- 消息列表 -->
-    <LoadingSpinner v-if="loading" text="加载消息..." />
+    <!-- Message List -->
+    <LoadingSpinner v-if="loading" text="Loading messages..." />
 
     <div v-else-if="messages.length === 0" class="empty-state">
       <div class="empty-state-icon">📭</div>
-      <div class="empty-state-text">暂无消息</div>
+      <div class="empty-state-text">No messages yet</div>
     </div>
 
     <div v-else class="message-list">
@@ -45,48 +45,48 @@
       </div>
     </div>
 
-    <!-- 写消息对话框 -->
+    <!-- Compose Dialog -->
     <div v-if="showCompose" class="modal-overlay" @click.self="showCompose = false">
       <div class="modal">
         <div class="modal-header">
-          <h3 class="modal-title">✉️ 写消息</h3>
+          <h3 class="modal-title">✉️ Compose Message</h3>
           <button class="btn btn-ghost btn-sm" @click="showCompose = false">✕</button>
         </div>
         <div class="modal-body">
           <div class="form-group">
-            <label class="form-label">收件人 ID</label>
+            <label class="form-label">Recipient ID</label>
             <input
               v-model="composeForm.recipientId"
               class="form-input"
-              placeholder="输入收件人 ID"
+              placeholder="Enter recipient ID"
             />
           </div>
           <div class="form-group">
-            <label class="form-label">标题</label>
+            <label class="form-label">Title</label>
             <input
               v-model="composeForm.title"
               class="form-input"
-              placeholder="输入消息标题"
+              placeholder="Enter message title"
             />
           </div>
           <div class="form-group">
-            <label class="form-label">内容</label>
+            <label class="form-label">Content</label>
             <textarea
               v-model="composeForm.content"
               class="form-textarea"
-              placeholder="输入消息内容..."
+              placeholder="Enter message content..."
               rows="4"
             ></textarea>
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" @click="showCompose = false">取消</button>
+          <button class="btn btn-secondary" @click="showCompose = false">Cancel</button>
           <button
             class="btn btn-primary"
             @click="handleSend"
             :disabled="sending"
           >
-            {{ sending ? '发送中...' : '📤 发送' }}
+            {{ sending ? 'Sending...' : '📤 Send' }}
           </button>
         </div>
       </div>
@@ -122,20 +122,20 @@ const loadMessages = async () => {
     messages.value = await getMessages('user-1', 50)
   } catch (e) {
     statusType.value = 'error'
-    statusMsg.value = `加载消息失败: ${e}`
+    statusMsg.value = `Failed to load messages: ${e}`
   } finally {
     loading.value = false
   }
 }
 
 const handleSearch = () => {
-  // 本地过滤
+  // Local filter
 }
 
 const handleSend = async () => {
   if (!composeForm.value.recipientId || !composeForm.value.content) {
     statusType.value = 'error'
-    statusMsg.value = '请填写收件人和消息内容'
+    statusMsg.value = 'Please fill in recipient and message content'
     return
   }
 
@@ -148,13 +148,13 @@ const handleSend = async () => {
       composeForm.value.content
     )
     statusType.value = 'success'
-    statusMsg.value = '消息发送成功'
+    statusMsg.value = 'Message sent successfully'
     showCompose.value = false
     composeForm.value = { recipientId: '', title: '', content: '' }
     await loadMessages()
   } catch (e) {
     statusType.value = 'error'
-    statusMsg.value = `发送失败: ${e}`
+    statusMsg.value = `Failed to send: ${e}`
   } finally {
     sending.value = false
   }
@@ -163,7 +163,7 @@ const handleSend = async () => {
 const formatTime = (timestamp: string) => {
   try {
     const d = new Date(timestamp)
-    return d.toLocaleString('zh-CN')
+    return d.toLocaleString()
   } catch {
     return timestamp
   }

@@ -2,11 +2,11 @@
   <div class="data-create-view">
     <div class="page-header">
       <div>
-        <h1 class="page-title">➕ 新建数据</h1>
-        <p class="page-subtitle">存储新的数据条目</p>
+        <h1 class="page-title">➕ New Data</h1>
+        <p class="page-subtitle">Store a new data item</p>
       </div>
       <router-link to="/data" class="btn btn-secondary">
-        ← 返回列表
+        ← Back to Data
       </router-link>
     </div>
 
@@ -20,7 +20,7 @@
     <div class="card">
       <form @submit.prevent="handleSubmit">
         <div class="form-group">
-          <label class="form-label">数据类型</label>
+          <label class="form-label">Data Type</label>
           <select v-model="form.dataType" class="form-select">
             <option v-for="opt in DATA_TYPE_OPTIONS" :key="opt.value" :value="opt.value">
               {{ opt.icon }} {{ opt.label }}
@@ -29,32 +29,32 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">内容</label>
+          <label class="form-label">Content</label>
           <textarea
             v-model="form.content"
             class="form-textarea"
-            placeholder="输入数据内容..."
+            placeholder="Enter data content..."
             rows="6"
             required
           ></textarea>
-          <span class="form-hint">支持文本、JSON、配置文件等内容</span>
+          <span class="form-hint">Supports text, JSON, config files, etc.</span>
         </div>
 
         <div class="form-group">
-          <label class="form-label">标签</label>
+          <label class="form-label">Tags</label>
           <input
             v-model="form.tags"
             class="form-input"
-            placeholder="输入标签，用逗号分隔 (如: 工作, 重要)"
+            placeholder="Enter tags, comma separated (e.g.: work, important)"
           />
-          <span class="form-hint">多个标签用逗号分隔</span>
+          <span class="form-hint">Separate multiple tags with commas</span>
         </div>
 
         <div class="form-actions">
           <button type="submit" class="btn btn-primary" :disabled="submitting">
-            {{ submitting ? '存储中...' : '💾 存储数据' }}
+            {{ submitting ? 'Storing...' : '💾 Store Data' }}
           </button>
-          <router-link to="/data" class="btn btn-secondary">取消</router-link>
+          <router-link to="/data" class="btn btn-secondary">Cancel</router-link>
         </div>
       </form>
     </div>
@@ -84,7 +84,7 @@ const statusType = ref<'success' | 'error'>('success')
 const handleSubmit = async () => {
   if (!form.value.content.trim()) {
     statusType.value = 'error'
-    statusMsg.value = '请输入数据内容'
+    statusMsg.value = 'Please enter data content'
     return
   }
 
@@ -99,15 +99,15 @@ const handleSubmit = async () => {
     await storeData('demo-token', form.value.dataType, form.value.content, tags)
 
     statusType.value = 'success'
-    statusMsg.value = '数据存储成功！'
+    statusMsg.value = 'Data stored successfully!'
 
-    // 1秒后跳转
+    // Redirect after 1 second
     setTimeout(() => {
       router.push('/data')
     }, 1000)
   } catch (e) {
     statusType.value = 'error'
-    statusMsg.value = `存储失败: ${e}`
+    statusMsg.value = `Storage failed: ${e}`
   } finally {
     submitting.value = false
   }

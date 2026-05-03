@@ -4,7 +4,7 @@
 
 import { request } from './adapter'
 import { setToken, clearToken } from './auth'
-import type { SearchResult, StatsInfo, MessageInfo, DataType, DataItemInfo, StorageInfo } from '../types'
+import type { SearchResult, StatsInfo, MessageInfo, DataType, DataItemInfo, StorageInfo, ShareRequest, HealthStatus, FolderNode } from '../types'
 
 // ============================================================
 // Auth
@@ -160,4 +160,169 @@ export async function getStorageInfo(): Promise<StorageInfo> {
       backend_type: 'unknown',
       is_configured: false,
     }))
+}
+
+// ============================================================
+// Health
+// ============================================================
+
+/** Get system health status */
+export async function getHealthStatus(): Promise<HealthStatus> {
+  // Mock data - no dedicated endpoint yet
+  return {
+    status: 'healthy',
+    uptime: Date.now() - 86400000,
+    last_check: new Date().toISOString(),
+    storage_backend: 'local',
+    version: 'v0.1.0',
+  }
+}
+
+// ============================================================
+// Shares (Mock - endpoints not yet implemented)
+// ============================================================
+
+/** Get all share requests (incoming + outgoing) */
+export async function getShareRequests(): Promise<ShareRequest[]> {
+  // Mock data for development
+  return [
+    {
+      id: 'share-001',
+      data_id: 'data-abc',
+      data_title: 'AWS Credentials',
+      sender_id: 'user-1',
+      sender_name: 'Alice',
+      recipient_id: 'user-2',
+      recipient_name: 'Bob',
+      status: 'pending',
+      permission: 'read',
+      created_at: '2026-05-01T10:30:00Z',
+      updated_at: '2026-05-01T10:30:00Z',
+      message: 'Need access to deploy pipeline credentials',
+    },
+    {
+      id: 'share-002',
+      data_id: 'data-def',
+      data_title: 'Server Config',
+      sender_id: 'user-2',
+      sender_name: 'Bob',
+      recipient_id: 'user-3',
+      recipient_name: 'Charlie',
+      status: 'approved',
+      permission: 'read',
+      created_at: '2026-04-28T14:00:00Z',
+      updated_at: '2026-04-29T09:15:00Z',
+      message: 'Production server config for monitoring',
+    },
+    {
+      id: 'share-003',
+      data_id: 'data-ghi',
+      data_title: 'Contact List',
+      sender_id: 'user-3',
+      sender_name: 'Charlie',
+      recipient_id: 'user-1',
+      recipient_name: 'Alice',
+      status: 'pending',
+      permission: 'write',
+      created_at: '2026-05-02T16:45:00Z',
+      updated_at: '2026-05-02T16:45:00Z',
+      message: 'Collaborative contact database',
+    },
+    {
+      id: 'share-004',
+      data_id: 'data-jkl',
+      data_title: 'API Keys',
+      sender_id: 'user-1',
+      sender_name: 'Alice',
+      recipient_id: 'user-4',
+      recipient_name: 'Diana',
+      status: 'denied',
+      permission: 'read',
+      created_at: '2026-04-25T08:00:00Z',
+      updated_at: '2026-04-26T11:30:00Z',
+    },
+    {
+      id: 'share-005',
+      data_id: 'data-mno',
+      data_title: 'Shared Notes',
+      sender_id: 'user-2',
+      sender_name: 'Bob',
+      recipient_id: 'user-1',
+      recipient_name: 'Alice',
+      status: 'revoked',
+      permission: 'write',
+      created_at: '2026-04-20T09:00:00Z',
+      updated_at: '2026-05-01T12:00:00Z',
+    },
+  ]
+}
+
+/** Approve a share request */
+export async function approveShareRequest(shareId: string): Promise<boolean> {
+  console.log(`[Mock] Approving share request: ${shareId}`)
+  // TODO: Replace with real API call
+  return true
+}
+
+/** Deny a share request */
+export async function denyShareRequest(shareId: string): Promise<boolean> {
+  console.log(`[Mock] Denying share request: ${shareId}`)
+  // TODO: Replace with real API call
+  return true
+}
+
+/** Revoke an active share */
+export async function revokeShare(shareId: string): Promise<boolean> {
+  console.log(`[Mock] Revoking share: ${shareId}`)
+  // TODO: Replace with real API call
+  return true
+}
+
+// ============================================================
+// Folder Tree (Mock)
+// ============================================================
+
+/** Get folder tree structure */
+export async function getFolderTree(): Promise<FolderNode[]> {
+  // Mock data for development
+  return [
+    {
+      id: 'root-credentials',
+      name: '🔑 Credentials',
+      type: 'folder',
+      children: [
+        { id: 'cred-aws', name: 'AWS Keys', type: 'file', data_type: 'credential' },
+        { id: 'cred-gcp', name: 'GCP Service Account', type: 'file', data_type: 'credential' },
+        { id: 'cred-db', name: 'Database Passwords', type: 'file', data_type: 'credential' },
+      ],
+    },
+    {
+      id: 'root-configs',
+      name: '⚙️ Configurations',
+      type: 'folder',
+      children: [
+        { id: 'cfg-server', name: 'Server Config', type: 'file', data_type: 'config' },
+        { id: 'cfg-docker', name: 'Docker Compose', type: 'file', data_type: 'config' },
+        { id: 'cfg-nginx', name: 'Nginx Rules', type: 'file', data_type: 'config' },
+      ],
+    },
+    {
+      id: 'root-contacts',
+      name: '👤 Contacts',
+      type: 'folder',
+      children: [
+        { id: 'cnt-team', name: 'Team Members', type: 'file', data_type: 'contact' },
+        { id: 'cnt-vendors', name: 'Vendors', type: 'file', data_type: 'contact' },
+      ],
+    },
+    {
+      id: 'root-files',
+      name: '📁 Files',
+      type: 'folder',
+      children: [
+        { id: 'file-notes', name: 'Project Notes', type: 'file', data_type: 'file' },
+        { id: 'file-docs', name: 'Documentation', type: 'file', data_type: 'file' },
+      ],
+    },
+  ]
 }
