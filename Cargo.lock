@@ -1556,6 +1556,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "synapse-core"
+version = "0.1.0"
+dependencies = [
+ "data_core",
+ "iam_core",
+ "messaging_service",
+ "search_indexer",
+ "storage_backends",
+ "synapse_service",
+ "tempfile",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "synapse-web"
 version = "0.1.0"
 dependencies = [

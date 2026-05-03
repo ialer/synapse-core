@@ -1,3 +1,25 @@
+[package]
+name = "synapse-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description = "SynapseCore - 高性能跨平台数据管理系统"
+license.workspace = true
+
+[dependencies]
+# Internal crates
+synapse_service = { path = "crates/synapse_service" }
+data_core = { path = "crates/data_core" }
+iam_core = { path = "crates/iam_core" }
+storage_backends = { path = "crates/storage_backends" }
+search_indexer = { path = "crates/search_indexer" }
+messaging_service = { path = "crates/messaging_service" }
+uuid = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+tempfile = "3"
+
 [workspace]
 members = [
     "crates/data_core",
