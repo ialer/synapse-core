@@ -15,7 +15,7 @@ pub enum SearchError {
     
     /// 存储错误
     #[error("存储错误: {0}")]
-    Storage(#[from] storage_backends::StorageError),
+    Storage(String),
     
     /// 内部错误
     #[error("内部错误: {0}")]

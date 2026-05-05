@@ -1479,7 +1479,6 @@ dependencies = [
  "async-trait",
  "serde",
  "serde_json",
- "storage_backends",
  "thiserror",
  "tokio",
 ]
