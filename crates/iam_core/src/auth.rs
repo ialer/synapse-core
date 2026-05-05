@@ -217,7 +217,7 @@ impl AuthService for MemoryAuthService {
     
     async fn check_permission(&self, user_id: &str, permission: &str) -> AuthResult<bool> {
         let user_role = self.get_user_role(user_id).await?;
-        let permission = crate::rbac::Permission::from_str(permission)
+        let permission = crate::rbac::Permission::parse_permission(permission)
             .ok_or_else(|| crate::error::AuthError::InvalidToken(format!("Invalid permission: {}", permission)))?;
         
         Ok(user_role.has_permission(&permission))

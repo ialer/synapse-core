@@ -2,10 +2,9 @@
 //! 
 //! 提供多种冲突解决策略。
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::sync::{SyncRecord, SyncOperation};
+use crate::sync::SyncRecord;
 
 /// 冲突解决策略
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -134,7 +133,8 @@ impl ConflictDetector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sync::{SyncOperation, SyncEngine};
+    use chrono::Utc;
+    use crate::sync::{SyncEngine, SyncOperation};
 
     #[test]
     fn test_conflict_resolver_lww() {

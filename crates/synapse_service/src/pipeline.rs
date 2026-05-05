@@ -118,12 +118,11 @@ impl DataPipeline {
         });
 
         // 1. Transform (via user-provided handler)
-        let transformed = handler(&key, &data).map_err(|e| {
+        let transformed = handler(&key, &data).inspect_err(|e| {
             self.emit(PipelineEvent::Failed {
                 key: key.clone(),
                 error: e.to_string(),
             });
-            e
         })?;
         self.emit(PipelineEvent::Transformed {
             key: key.clone(),
@@ -220,9 +219,8 @@ impl DataPipeline {
         });
 
         // Transform
-        let transformed = transform(&data).map_err(|e| {
+        let transformed = transform(&data).inspect_err(|e| {
             self.emit(PipelineEvent::Failed { key: key.clone(), error: e.to_string() });
-            e
         })?;
         self.emit(PipelineEvent::Transformed {
             key: key.clone(),
@@ -232,9 +230,8 @@ impl DataPipeline {
 
         // Encrypt
         let encrypted = if self.config.encrypt {
-            let enc = encrypt(&transformed).map_err(|e| {
+            let enc = encrypt(&transformed).inspect_err(|e| {
                 self.emit(PipelineEvent::Failed { key: key.clone(), error: e.to_string() });
-                e
             })?;
             self.emit(PipelineEvent::Encrypted {
                 key: key.clone(),
@@ -247,17 +244,15 @@ impl DataPipeline {
         };
 
         // Store
-        store(&key, &encrypted).map_err(|e| {
+        store(&key, &encrypted).inspect_err(|e| {
             self.emit(PipelineEvent::Failed { key: key.clone(), error: e.to_string() });
-            e
         })?;
         self.emit(PipelineEvent::Stored { key: key.clone() });
 
         // Index
         if self.config.index {
-            index(&key, &encrypted).map_err(|e| {
+            index(&key, &encrypted).inspect_err(|e| {
                 self.emit(PipelineEvent::Failed { key: key.clone(), error: e.to_string() });
-                e
             })?;
             self.emit(PipelineEvent::Indexed { key: key.clone() });
         }

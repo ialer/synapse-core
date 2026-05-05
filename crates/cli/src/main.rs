@@ -79,7 +79,7 @@ async fn main() -> anyhow::Result<()> {
             println!("Token: {}", token);
         }
         Commands::Store { token, data_type, content, tags } => {
-            let dt = data_core::DataType::from_str(&data_type).unwrap_or(data_core::DataType::Generic);
+            let dt = data_core::DataType::parse_type(&data_type).unwrap_or(data_core::DataType::Generic);
             let entity = app.secure_store(&token, dt, content.into_bytes(), tags).await?;
             println!("存储成功");
             println!("ID: {}", entity.id);

@@ -5,7 +5,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::error::{SyncError, SyncResult};
+use crate::error::SyncError;
 
 /// 同步操作类型
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

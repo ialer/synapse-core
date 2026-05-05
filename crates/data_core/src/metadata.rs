@@ -52,22 +52,20 @@ impl Default for Metadata {
 }
 
 /// 元数据构建器
-/// 
+///
 /// 提供流式 API 构建元数据。
-/// 
+///
 /// # 示例
-/// 
+///
 /// ```rust
 /// use data_core::MetadataBuilder;
-/// 
+///
 /// let metadata = MetadataBuilder::new()
 ///     .source("android-phone")
 ///     .mime_type("application/json")
-///     .priority(80)
-///     .favorite(true)
-///     .property("app", "chrome")
 ///     .build();
 /// ```
+#[derive(Debug, Default)]
 pub struct MetadataBuilder {
     metadata: Metadata,
 }

@@ -2,7 +2,6 @@
 //! 
 //! 提供命令行工具接口，支持 Agent 直接调用。
 
-use std::collections::HashMap;
 
 /// CLI 命令
 #[derive(Debug, Clone)]
@@ -178,14 +177,14 @@ impl CliInterface {
                     data: None,
                 }
             }
-            CliCommand::Create { data_type, content, tags } => {
+            CliCommand::Create { data_type, content: _, tags } => {
                 CliResult {
                     success: true,
                     message: format!("Creating {} data with tags {:?}", data_type, tags),
                     data: None,
                 }
             }
-            CliCommand::Update { id, content, tags } => {
+            CliCommand::Update { id, content: _, tags: _ } => {
                 CliResult {
                     success: true,
                     message: format!("Updating data {}", id),

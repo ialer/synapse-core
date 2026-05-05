@@ -97,7 +97,8 @@ pub struct SynapseApp {
     /// 消息服务
     message_service: MessageService,
     
-    /// 通知管理器
+    /// 通知管理器 (预留)
+    #[allow(dead_code)]
     notification_manager: NotificationManager,
     
     /// 数据存储（内存版本，内部使用）
@@ -518,6 +519,7 @@ impl SynapseApp {
     }
 
     /// 获取数据实体（内部使用）
+    #[allow(dead_code)]
     pub(crate) fn get_data_item(&self, id: &str) -> Option<&DataEntity> {
         self.data_store.get(id)
     }
@@ -656,7 +658,7 @@ impl DataProvider for AppDataProvider {
     ) -> Result<String, String> {
         let mut app = self.app.lock().await;
 
-        let dt = data_core::DataType::from_str(data_type)
+        let dt = data_core::DataType::parse_type(data_type)
             .ok_or_else(|| format!("Invalid data type: {}", data_type))?;
 
         match app.secure_store(token, dt, content, tags).await {

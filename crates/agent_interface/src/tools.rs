@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use async_trait::async_trait;
 
-use crate::{DataProvider, SearchEntry};
+use crate::DataProvider;
 
 /// 工具定义
 #[derive(Debug, Clone)]
@@ -81,7 +81,7 @@ impl ToolRegistry {
     
     /// 执行工具
     pub async fn execute_tool(&self, name: &str, args: HashMap<String, serde_json::Value>) -> Result<ToolResult, String> {
-        let tool = self.tools.get(name).ok_or_else(|| format!("Tool not found: {}", name))?;
+        let _tool = self.tools.get(name).ok_or_else(|| format!("Tool not found: {}", name))?;
         let executor = self.executors.get(name).ok_or_else(|| format!("Executor not found: {}", name))?;
         
         // 检查权限（简化版本）

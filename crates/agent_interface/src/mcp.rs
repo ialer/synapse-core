@@ -570,7 +570,7 @@ impl McpServer {
     }
     
     /// 处理搜索数据请求（同步版本，返回空结果）
-    fn handle_search_data(&self, req: SearchRequest) -> McpResponse {
+    fn handle_search_data(&self, _req: SearchRequest) -> McpResponse {
         McpResponse {
             id: "1".to_string(),
             result: Some(McpResult::SearchResult(SearchResult {

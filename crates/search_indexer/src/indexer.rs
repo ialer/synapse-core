@@ -28,6 +28,7 @@ pub struct Indexer {
 
 /// 索引统计
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct IndexStats {
     /// 总条目数
     pub total_entries: usize,
@@ -36,14 +37,6 @@ pub struct IndexStats {
     pub total_size: usize,
 }
 
-impl Default for IndexStats {
-    fn default() -> Self {
-        Self {
-            total_entries: 0,
-            total_size: 0,
-        }
-    }
-}
 
 impl Indexer {
     /// 创建新的索引构建器

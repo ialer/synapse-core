@@ -320,12 +320,8 @@ impl ShareGrant {
 
 /// 检查权限级别是否满足所需级别
 pub fn permission_meets(granted: PermissionLevel, required: PermissionLevel) -> bool {
-    match (granted, required) {
-        (PermissionLevel::Admin, _) => true,
-        (PermissionLevel::Edit, PermissionLevel::Edit | PermissionLevel::View) => true,
-        (PermissionLevel::View, PermissionLevel::View) => true,
-        _ => false,
-    }
+    matches!((granted, required),
+        (PermissionLevel::Admin, _) | (PermissionLevel::Edit, PermissionLevel::Edit | PermissionLevel::View) | (PermissionLevel::View, PermissionLevel::View))
 }
 
 #[cfg(test)]

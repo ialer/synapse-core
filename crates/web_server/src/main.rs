@@ -252,7 +252,7 @@ async fn store_data(
     State(state): State<SharedState>,
     Json(req): Json<StoreDataRequest>,
 ) -> impl IntoResponse {
-    let data_type = match DataType::from_str(&req.data_type) {
+    let data_type = match DataType::parse_type(&req.data_type) {
         Some(dt) => dt,
         None => {
             return error_response(

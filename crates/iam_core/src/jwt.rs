@@ -86,7 +86,7 @@ impl Claims {
     
     /// 获取角色
     pub fn get_role(&self) -> Option<Role> {
-        Role::from_str(&self.role)
+        Role::parse_role(&self.role)
     }
 }
 
@@ -182,7 +182,7 @@ impl JwtService {
         
         // 解码 payload
         let payload = base64url_decode(parts[1])
-            .map_err(|e| AuthError::InvalidToken(e))?;
+            .map_err(AuthError::InvalidToken)?;
         
         let claims: Claims = serde_json::from_slice(&payload)
             .map_err(|e| AuthError::InvalidToken(e.to_string()))?;
@@ -244,7 +244,7 @@ impl JwtService {
 fn base64url_encode(data: &[u8]) -> String {
     const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     
-    let mut result = String::with_capacity((data.len() * 4 + 2) / 3);
+    let mut result = String::with_capacity((data.len() * 4).div_ceil(3));
     for chunk in data.chunks(3) {
         let b0 = chunk[0] as u32;
         let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };

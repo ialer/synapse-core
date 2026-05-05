@@ -64,7 +64,7 @@ impl DataType {
     }
 
     /// 从字符串解析数据类型
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse_type(s: &str) -> Option<Self> {
         match s {
             "credential" => Some(DataType::Credential),
             "config" => Some(DataType::Config),
@@ -278,12 +278,8 @@ impl DataEntity {
         }
         self.shared_with.iter().any(|p| {
             p.user_id == *user_id
-                && match (p.level, level) {
-                    (PermissionLevel::Admin, _) => true,
-                    (PermissionLevel::Edit, PermissionLevel::Edit | PermissionLevel::View) => true,
-                    (PermissionLevel::View, PermissionLevel::View) => true,
-                    _ => false,
-                }
+                && matches!((p.level, level),
+                    (PermissionLevel::Admin, _) | (PermissionLevel::Edit, PermissionLevel::Edit | PermissionLevel::View) | (PermissionLevel::View, PermissionLevel::View))
         })
     }
 
@@ -375,8 +371,8 @@ mod tests {
     #[test]
     fn test_data_type_conversion() {
         assert_eq!(DataType::Credential.as_str(), "credential");
-        assert_eq!(DataType::from_str("config"), Some(DataType::Config));
-        assert_eq!(DataType::from_str("invalid"), None);
+        assert_eq!(DataType::parse_type("config"), Some(DataType::Config));
+        assert_eq!(DataType::parse_type("invalid"), None);
     }
 
     #[test]

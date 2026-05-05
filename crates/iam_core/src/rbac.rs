@@ -7,12 +7,14 @@ use std::fmt;
 
 /// 角色枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum Role {
     /// 管理员 - 拥有所有权限
     Admin,
     /// 普通用户 - 拥有基础权限
     User,
     /// 访客 - 只有只读权限
+    #[default]
     Guest,
 }
 
@@ -27,7 +29,7 @@ impl Role {
     }
     
     /// 从字符串解析角色
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse_role(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "admin" => Some(Role::Admin),
             "user" => Some(Role::User),
@@ -71,11 +73,6 @@ impl fmt::Display for Role {
     }
 }
 
-impl Default for Role {
-    fn default() -> Self {
-        Role::Guest
-    }
-}
 
 /// 权限枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -102,7 +99,7 @@ impl Permission {
     }
     
     /// 从字符串解析权限
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse_permission(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "read" => Some(Permission::Read),
             "write" => Some(Permission::Write),

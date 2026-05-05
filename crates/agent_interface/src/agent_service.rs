@@ -8,9 +8,9 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::mcp::{McpRequest, McpResponse, McpResult, McpError};
-use crate::tools::{ToolRegistry, ToolResult};
+use crate::tools::ToolRegistry;
 use crate::mcp::ToolInfo;
-use crate::{DataProvider, SearchEntry, ListEntry};
+use crate::DataProvider;
 
 /// Agent 访问权限
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -150,7 +150,8 @@ pub struct MemoryAgentService {
     /// 会话存储
     sessions: HashMap<String, AgentSession>,
     
-    /// 工具注册表
+    /// 工具注册表 (预留)
+    #[allow(dead_code)]
     tool_registry: ToolRegistry,
 
     /// 数据提供者
@@ -325,7 +326,7 @@ impl AgentService for MemoryAgentService {
             }
             McpRequest::CallTool(req) => {
                 // 通过 ToolRegistry 执行工具调用
-                let mut registry = crate::tools::create_registry_with_provider(self.provider.clone());
+                let registry = crate::tools::create_registry_with_provider(self.provider.clone());
                 match registry.execute_tool(&req.name, req.arguments).await {
                     Ok(tool_result) => McpResponse {
                         id: "1".to_string(),
@@ -500,7 +501,7 @@ impl AgentService for MemoryAgentService {
         let (id, data_type_str, tags, _content) = self.provider
             .get_data(&session.session_id, data_id)
             .await
-            .map_err(|e| AgentError::DataNotFound(e))?;
+            .map_err(AgentError::DataNotFound)?;
         
         Ok(DataItem {
             id,

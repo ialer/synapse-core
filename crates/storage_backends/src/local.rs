@@ -28,7 +28,7 @@ impl LocalBackend {
     }
     
     /// 确保目录存在
-    async fn ensure_dir(&self, path: &PathBuf) -> StorageResult<()> {
+    async fn ensure_dir(&self, path: &std::path::Path) -> StorageResult<()> {
         if let Some(parent) = path.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
@@ -145,10 +145,10 @@ impl LocalBackend {
         
         let metadata = tokio::fs::metadata(&path).await?;
         let created = metadata.created()
-            .map(|t| chrono::DateTime::from(t))
+            .map(chrono::DateTime::from)
             .unwrap_or_else(|_| chrono::Utc::now());
         let modified = metadata.modified()
-            .map(|t| chrono::DateTime::from(t))
+            .map(chrono::DateTime::from)
             .unwrap_or_else(|_| chrono::Utc::now());
         
         Ok(StorageMetadata {
