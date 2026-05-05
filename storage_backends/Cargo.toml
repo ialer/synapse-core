@@ -1,0 +1,24 @@
+[package]
+name = "storage_backends"
+version.workspace = true
+edition.workspace = true
+description = "存储后端模块 - 本地与云端存储"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+opendal = { version = "0.55", default-features = false, features = [
+    "services-webdav",
+    "services-s3",
+    "services-oss",
+    "executors-tokio"
+] }
+url = "2.4"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+tempfile = "3"

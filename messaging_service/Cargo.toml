@@ -1,0 +1,14 @@
+[package]
+name = "messaging_service"
+version.workspace = true
+edition.workspace = true
+description = "消息服务模块 - 消息处理与通知管理"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
