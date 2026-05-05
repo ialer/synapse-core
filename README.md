@@ -3,13 +3,21 @@
 > 高性能、模块化的跨平台数据管理系统
 
 [![CI](https://github.com/ialer/synapse-core/actions/workflows/ci.yml/badge.svg)](https://github.com/ialer/synapse-core/actions/workflows/ci.yml)
-[![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/Rust-1.75+-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Android%20%7C%20iOS-lightgrey.svg)]()
+[![Version](https://img.shields.io/badge/version-0.2.0-green.svg)](CHANGELOG.md)
 
 ## 项目简介
 
 SynapseCore 是一个高性能、模块化的跨平台数据管理系统，为个人/团队/家庭提供统一的数据备份、交互和管理能力。
+
+### 🆕 v0.2.0 新特性
+
+- **安全审计修复** — 消除硬编码密钥，所有 API 强制认证
+- **MCP 工具完整实现** — update/delete/list 真实操作（非 stub）
+- **178 项测试** — 端到端集成测试覆盖全部核心流程
+- **Clippy 零警告** — 代码质量达标
 
 ### 核心特性
 

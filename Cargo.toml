@@ -40,7 +40,7 @@ exclude = [
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["ialer"]
 description = "SynapseCore - 高性能跨平台数据管理系统"
