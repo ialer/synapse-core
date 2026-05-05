@@ -665,6 +665,27 @@ impl DataProvider for AppDataProvider {
         }
     }
 
+    async fn update_data(
+        &self,
+        token: &str,
+        id: &str,
+        content: Vec<u8>,
+        tags: Vec<String>,
+    ) -> Result<(), String> {
+        let mut app = self.app.lock().await;
+        app.secure_update(token, id, content, tags)
+            .await
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+
+    async fn delete_data(&self, token: &str, id: &str) -> Result<(), String> {
+        let mut app = self.app.lock().await;
+        app.secure_delete(token, id)
+            .await
+            .map_err(|e| e.to_string())
+    }
+
     async fn list_all_data(&self) -> Vec<ListEntry> {
         let app = self.app.lock().await;
 

@@ -73,6 +73,18 @@ pub trait DataProvider: Send + Sync {
         tags: Vec<String>,
     ) -> Result<String, String>;
 
+    /// 更新已加密数据的内容
+    async fn update_data(
+        &self,
+        token: &str,
+        id: &str,
+        content: Vec<u8>,
+        tags: Vec<String>,
+    ) -> Result<(), String>;
+
+    /// 删除数据
+    async fn delete_data(&self, token: &str, id: &str) -> Result<(), String>;
+
     /// 列出所有数据基本信息（不含加密内容）
     async fn list_all_data(&self) -> Vec<ListEntry>;
 }
@@ -110,6 +122,20 @@ impl DataProvider for NullDataProvider {
         _content: Vec<u8>,
         _tags: Vec<String>,
     ) -> Result<String, String> {
+        Err("No storage backend available".to_string())
+    }
+
+    async fn update_data(
+        &self,
+        _token: &str,
+        _id: &str,
+        _content: Vec<u8>,
+        _tags: Vec<String>,
+    ) -> Result<(), String> {
+        Err("No storage backend available".to_string())
+    }
+
+    async fn delete_data(&self, _token: &str, _id: &str) -> Result<(), String> {
         Err("No storage backend available".to_string())
     }
 

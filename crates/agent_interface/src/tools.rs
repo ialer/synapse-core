@@ -271,6 +271,140 @@ impl ToolExecutor for CreateDataTool {
     }
 }
 
+/// 预定义工具：更新个人数据
+pub struct UpdateDataTool {
+    provider: Arc<dyn DataProvider>,
+}
+
+impl UpdateDataTool {
+    pub fn new(provider: Arc<dyn DataProvider>) -> Self {
+        Self { provider }
+    }
+}
+
+#[async_trait]
+impl ToolExecutor for UpdateDataTool {
+    async fn execute(&self, args: HashMap<String, serde_json::Value>) -> Result<ToolResult, String> {
+        let id = args.get("id")
+            .and_then(|v| v.as_str())
+            .ok_or("Missing 'id' argument")?;
+        let content = args.get("content")
+            .and_then(|v| v.as_str())
+            .ok_or("Missing 'content' argument")?;
+        let token = args.get("token")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let tags: Vec<String> = args.get("tags")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .unwrap_or_default();
+
+        match self.provider.update_data(token, id, content.as_bytes().to_vec(), tags).await {
+            Ok(()) => Ok(ToolResult {
+                success: true,
+                output: serde_json::to_string_pretty(&serde_json::json!({
+                    "success": true,
+                    "id": id,
+                    "message": "Data updated successfully"
+                })).unwrap(),
+                metadata: HashMap::new(),
+            }),
+            Err(e) => Ok(ToolResult {
+                success: false,
+                output: serde_json::to_string_pretty(&serde_json::json!({
+                    "success": false,
+                    "error": e
+                })).unwrap(),
+                metadata: HashMap::new(),
+            }),
+        }
+    }
+}
+
+/// 预定义工具：删除个人数据
+pub struct DeleteDataTool {
+    provider: Arc<dyn DataProvider>,
+}
+
+impl DeleteDataTool {
+    pub fn new(provider: Arc<dyn DataProvider>) -> Self {
+        Self { provider }
+    }
+}
+
+#[async_trait]
+impl ToolExecutor for DeleteDataTool {
+    async fn execute(&self, args: HashMap<String, serde_json::Value>) -> Result<ToolResult, String> {
+        let id = args.get("id")
+            .and_then(|v| v.as_str())
+            .ok_or("Missing 'id' argument")?;
+        let token = args.get("token")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        match self.provider.delete_data(token, id).await {
+            Ok(()) => Ok(ToolResult {
+                success: true,
+                output: serde_json::to_string_pretty(&serde_json::json!({
+                    "success": true,
+                    "id": id,
+                    "message": "Data deleted successfully"
+                })).unwrap(),
+                metadata: HashMap::new(),
+            }),
+            Err(e) => Ok(ToolResult {
+                success: false,
+                output: serde_json::to_string_pretty(&serde_json::json!({
+                    "success": false,
+                    "error": e
+                })).unwrap(),
+                metadata: HashMap::new(),
+            }),
+        }
+    }
+}
+
+/// 预定义工具：列出所有数据
+pub struct ListDataTool {
+    provider: Arc<dyn DataProvider>,
+}
+
+impl ListDataTool {
+    pub fn new(provider: Arc<dyn DataProvider>) -> Self {
+        Self { provider }
+    }
+}
+
+#[async_trait]
+impl ToolExecutor for ListDataTool {
+    async fn execute(&self, args: HashMap<String, serde_json::Value>) -> Result<ToolResult, String> {
+        let limit = args.get("limit")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(50) as usize;
+
+        let entries = self.provider.list_all_data().await;
+        let truncated: Vec<_> = entries.into_iter().take(limit).collect();
+        let results: Vec<serde_json::Value> = truncated.into_iter().map(|entry| {
+            serde_json::json!({
+                "id": entry.id,
+                "type": entry.data_type,
+                "tags": entry.tags,
+                "created_at": entry.created_at,
+            })
+        }).collect();
+
+        Ok(ToolResult {
+            success: true,
+            output: serde_json::to_string_pretty(&serde_json::json!({
+                "total": results.len(),
+                "limit": limit,
+                "items": results,
+            })).unwrap(),
+            metadata: HashMap::new(),
+        })
+    }
+}
+
 /// 创建默认工具注册表（无数据后端）
 pub fn create_default_registry() -> ToolRegistry {
     let provider = Arc::new(crate::NullDataProvider);
@@ -366,9 +500,88 @@ pub fn create_registry_with_provider(provider: Arc<dyn DataProvider>) -> ToolReg
             }),
             permissions: vec!["write".to_string()],
         },
-        Box::new(CreateDataTool::new(provider)),
+        Box::new(CreateDataTool::new(provider.clone())),
     );
-    
+
+    // 注册更新工具
+    registry.register(
+        Tool {
+            name: "update_data".to_string(),
+            description: "Update existing personal data".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "Data ID to update"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "New data content"
+                    },
+                    "token": {
+                        "type": "string",
+                        "description": "Authentication token"
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "New tags for the data"
+                    }
+                },
+                "required": ["id", "content"]
+            }),
+            permissions: vec!["write".to_string()],
+        },
+        Box::new(UpdateDataTool::new(provider.clone())),
+    );
+
+    // 注册删除工具
+    registry.register(
+        Tool {
+            name: "delete_data".to_string(),
+            description: "Delete personal data by ID".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "Data ID to delete"
+                    },
+                    "token": {
+                        "type": "string",
+                        "description": "Authentication token"
+                    }
+                },
+                "required": ["id"]
+            }),
+            permissions: vec!["write".to_string()],
+        },
+        Box::new(DeleteDataTool::new(provider.clone())),
+    );
+
+    // 注册列表工具
+    registry.register(
+        Tool {
+            name: "list_data".to_string(),
+            description: "List all personal data items".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of results",
+                        "default": 50
+                    }
+                }
+            }),
+            permissions: vec!["read".to_string()],
+        },
+        Box::new(ListDataTool::new(provider)),
+    );
+
     registry
 }
 
@@ -381,10 +594,13 @@ mod tests {
     async fn test_tool_registry() {
         let registry = create_default_registry();
         
-        assert_eq!(registry.tool_count(), 3);
+        assert_eq!(registry.tool_count(), 6);
         assert!(registry.has_tool("search_data"));
         assert!(registry.has_tool("get_data"));
         assert!(registry.has_tool("create_data"));
+        assert!(registry.has_tool("update_data"));
+        assert!(registry.has_tool("delete_data"));
+        assert!(registry.has_tool("list_data"));
     }
 
     #[tokio::test]
