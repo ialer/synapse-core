@@ -46,3 +46,4 @@ perf.data*
 flamegraph.svg
 data/
 *.json
+.github/workflows/
