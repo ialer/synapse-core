@@ -323,6 +323,100 @@ impl AgentService for MemoryAgentService {
                     },
                 }
             }
+            McpRequest::CallTool(req) => {
+                // 通过 ToolRegistry 执行工具调用
+                let mut registry = crate::tools::create_registry_with_provider(self.provider.clone());
+                match registry.execute_tool(&req.name, req.arguments).await {
+                    Ok(tool_result) => McpResponse {
+                        id: "1".to_string(),
+                        result: Some(McpResult::ToolCall(crate::mcp::ToolCallResult {
+                            content: vec![crate::mcp::Content {
+                                content_type: "text".to_string(),
+                                text: tool_result.output,
+                            }],
+                            is_error: !tool_result.success,
+                        })),
+                        error: None,
+                    },
+                    Err(e) => McpResponse {
+                        id: "1".to_string(),
+                        result: None,
+                        error: Some(McpError {
+                            code: -1,
+                            message: format!("Tool execution error: {}", e),
+                        }),
+                    },
+                }
+            }
+            McpRequest::ListResources => McpResponse {
+                id: "1".to_string(),
+                result: Some(McpResult::ResourceList(vec![
+                    crate::mcp::ResourceInfo {
+                        uri: "synapse://data".to_string(),
+                        name: "Personal Data".to_string(),
+                        description: "Access personal data items".to_string(),
+                        mime_type: "application/json".to_string(),
+                    },
+                ])),
+                error: None,
+            },
+            McpRequest::ReadResource(req) => McpResponse {
+                id: "1".to_string(),
+                result: Some(McpResult::ResourceContent(crate::mcp::ResourceContent {
+                    uri: req.uri,
+                    mime_type: "application/json".to_string(),
+                    text: "{}".to_string(),
+                })),
+                error: None,
+            },
+            McpRequest::UpdateData(req) => {
+                // 尝试获取现有数据，然后更新
+                match self.provider.get_data(session_id, &req.id).await {
+                    Ok((_id, data_type_str, _tags, _content)) => {
+                        let new_content = req.content
+                            .map(|c| c.into_bytes())
+                            .unwrap_or_default();
+                        let new_tags = req.tags.unwrap_or_default();
+
+                        match self.provider.store_data(session_id, &data_type_str, new_content, new_tags).await {
+                            Ok(new_id) => McpResponse {
+                                id: "1".to_string(),
+                                result: Some(McpResult::OperationResult(crate::mcp::OperationResult {
+                                    success: true,
+                                    message: format!("Data updated (new id: {})", new_id),
+                                    id: Some(new_id),
+                                })),
+                                error: None,
+                            },
+                            Err(e) => McpResponse {
+                                id: "1".to_string(),
+                                result: None,
+                                error: Some(McpError {
+                                    code: -1,
+                                    message: format!("Failed to store updated data: {}", e),
+                                }),
+                            },
+                        }
+                    }
+                    Err(e) => McpResponse {
+                        id: "1".to_string(),
+                        result: None,
+                        error: Some(McpError {
+                            code: -1,
+                            message: format!("Data not found: {}", e),
+                        }),
+                    },
+                }
+            }
+            McpRequest::DeleteData(req) => McpResponse {
+                id: "1".to_string(),
+                result: Some(McpResult::OperationResult(crate::mcp::OperationResult {
+                    success: false,
+                    message: format!("Delete not supported by current DataProvider for id: {}", req.id),
+                    id: None,
+                })),
+                error: None,
+            },
             _ => McpResponse {
                 id: "1".to_string(),
                 result: None,
@@ -534,5 +628,253 @@ mod tests {
         let access = AgentAccess::default();
         let session = service.create_and_store_session("test-agent", access);
         assert!(!session.session_id.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_handle_mcp_request_initialize() {
+        let service = MemoryAgentService::new();
+        let mut service_mut = service;
+        let access = AgentAccess::default();
+        let session = service_mut.create_and_store_session("test-agent", access);
+        let session_id = session.session_id.clone();
+
+        let request = McpRequest::Initialize(crate::mcp::InitializeRequest {
+            client_info: crate::mcp::ClientInfo {
+                name: "test-client".to_string(),
+                version: "1.0.0".to_string(),
+            },
+            capabilities: vec!["tools".to_string()],
+        });
+
+        let response = service_mut.handle_mcp_request(&session_id, request).await;
+        assert!(response.result.is_some());
+        assert!(response.error.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_handle_mcp_request_list_tools() {
+        let service = MemoryAgentService::new();
+        let mut service_mut = service;
+        let access = AgentAccess::default();
+        let session = service_mut.create_and_store_session("test-agent", access);
+        let session_id = session.session_id.clone();
+
+        let response = service_mut.handle_mcp_request(&session_id, McpRequest::ListTools).await;
+        assert!(response.result.is_some());
+        assert!(response.error.is_none());
+
+        if let Some(McpResult::ToolList(tools)) = response.result {
+            assert_eq!(tools.len(), 1);
+            assert_eq!(tools[0].name, "search_data");
+        } else {
+            panic!("Expected ToolList");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_handle_mcp_request_call_tool() {
+        let service = MemoryAgentService::new();
+        let mut service_mut = service;
+        let access = AgentAccess::default();
+        let session = service_mut.create_and_store_session("test-agent", access);
+        let session_id = session.session_id.clone();
+
+        let mut args = std::collections::HashMap::new();
+        args.insert("query".to_string(), serde_json::json!("test"));
+
+        let request = McpRequest::CallTool(crate::mcp::CallToolRequest {
+            name: "search_data".to_string(),
+            arguments: args,
+        });
+
+        let response = service_mut.handle_mcp_request(&session_id, request).await;
+        assert!(response.result.is_some());
+        assert!(response.error.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_handle_mcp_request_call_tool_not_found() {
+        let service = MemoryAgentService::new();
+        let mut service_mut = service;
+        let access = AgentAccess::default();
+        let session = service_mut.create_and_store_session("test-agent", access);
+        let session_id = session.session_id.clone();
+
+        let request = McpRequest::CallTool(crate::mcp::CallToolRequest {
+            name: "nonexistent_tool".to_string(),
+            arguments: std::collections::HashMap::new(),
+        });
+
+        let response = service_mut.handle_mcp_request(&session_id, request).await;
+        // Tool not found returns an error
+        assert!(response.error.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_handle_mcp_request_list_resources() {
+        let service = MemoryAgentService::new();
+        let mut service_mut = service;
+        let access = AgentAccess::default();
+        let session = service_mut.create_and_store_session("test-agent", access);
+        let session_id = session.session_id.clone();
+
+        let response = service_mut.handle_mcp_request(&session_id, McpRequest::ListResources).await;
+        assert!(response.result.is_some());
+        assert!(response.error.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_handle_mcp_request_read_resource() {
+        let service = MemoryAgentService::new();
+        let mut service_mut = service;
+        let access = AgentAccess::default();
+        let session = service_mut.create_and_store_session("test-agent", access);
+        let session_id = session.session_id.clone();
+
+        let request = McpRequest::ReadResource(crate::mcp::ReadResourceRequest {
+            uri: "synapse://data".to_string(),
+        });
+
+        let response = service_mut.handle_mcp_request(&session_id, request).await;
+        assert!(response.result.is_some());
+        assert!(response.error.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_handle_mcp_request_create_data() {
+        let service = MemoryAgentService::new();
+        let mut service_mut = service;
+        let access = AgentAccess::default();
+        let session = service_mut.create_and_store_session("test-agent", access);
+        let session_id = session.session_id.clone();
+
+        let request = McpRequest::CreateData(crate::mcp::CreateDataRequest {
+            data_type: "generic".to_string(),
+            content: "test content".to_string(),
+            tags: Some(vec!["agent".to_string()]),
+        });
+
+        let response = service_mut.handle_mcp_request(&session_id, request).await;
+        // NullDataProvider will return error
+        assert!(response.error.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_handle_mcp_request_update_data() {
+        let service = MemoryAgentService::new();
+        let mut service_mut = service;
+        let access = AgentAccess::default();
+        let session = service_mut.create_and_store_session("test-agent", access);
+        let session_id = session.session_id.clone();
+
+        let request = McpRequest::UpdateData(crate::mcp::UpdateDataRequest {
+            id: "nonexistent".to_string(),
+            content: Some("new content".to_string()),
+            tags: None,
+        });
+
+        let response = service_mut.handle_mcp_request(&session_id, request).await;
+        // NullDataProvider.get_data will fail -> data not found error
+        assert!(response.error.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_handle_mcp_request_delete_data() {
+        let service = MemoryAgentService::new();
+        let mut service_mut = service;
+        let access = AgentAccess::default();
+        let session = service_mut.create_and_store_session("test-agent", access);
+        let session_id = session.session_id.clone();
+
+        let request = McpRequest::DeleteData(crate::mcp::DeleteDataRequest {
+            id: "test-id".to_string(),
+            hard_delete: Some(false),
+        });
+
+        let response = service_mut.handle_mcp_request(&session_id, request).await;
+        // Delete not supported by NullDataProvider
+        assert!(response.result.is_some());
+        if let Some(McpResult::OperationResult(op)) = response.result {
+            assert!(!op.success);
+            assert!(op.message.contains("Delete not supported"));
+        } else {
+            panic!("Expected OperationResult");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_handle_mcp_request_search_data() {
+        let mut service = MemoryAgentService::new();
+        let access = AgentAccess::default();
+        let session = service.create_and_store_session("test-agent", access);
+        let session_id = session.session_id.clone();
+
+        let request = McpRequest::SearchData(crate::mcp::SearchRequest {
+            query: "test".to_string(),
+            data_type: None,
+            tags: None,
+            limit: Some(5),
+        });
+
+        let response = service.handle_mcp_request(&session_id, request).await;
+        assert!(response.result.is_some());
+        assert!(response.error.is_none());
+
+        if let Some(McpResult::SearchResult(result)) = response.result {
+            assert_eq!(result.total, 0);
+        } else {
+            panic!("Expected SearchResult");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_handle_mcp_request_get_data() {
+        let mut service = MemoryAgentService::new();
+        let access = AgentAccess::default();
+        let session = service.create_and_store_session("test-agent", access);
+        let session_id = session.session_id.clone();
+
+        let request = McpRequest::GetData(crate::mcp::GetDataRequest {
+            id: "nonexistent".to_string(),
+        });
+
+        let response = service.handle_mcp_request(&session_id, request).await;
+        // NullDataProvider.get_data returns error
+        assert!(response.error.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_handle_mcp_request_all_variants() {
+        let mut service = MemoryAgentService::new();
+        let access = AgentAccess::default();
+        let session = service.create_and_store_session("test-agent", access);
+        let session_id = session.session_id.clone();
+
+        // Test Initialize
+        let resp = service.handle_mcp_request(&session_id, McpRequest::Initialize(crate::mcp::InitializeRequest {
+            client_info: crate::mcp::ClientInfo { name: "t".to_string(), version: "1".to_string() },
+            capabilities: vec![],
+        })).await;
+        assert!(resp.error.is_none());
+
+        // Test ListTools
+        let resp = service.handle_mcp_request(&session_id, McpRequest::ListTools).await;
+        assert!(resp.error.is_none());
+
+        // Test ListResources
+        let resp = service.handle_mcp_request(&session_id, McpRequest::ListResources).await;
+        assert!(resp.error.is_none());
+
+        // Test ReadResource
+        let resp = service.handle_mcp_request(&session_id, McpRequest::ReadResource(crate::mcp::ReadResourceRequest {
+            uri: "test://uri".to_string(),
+        })).await;
+        assert!(resp.error.is_none());
+
+        // Test DeleteData
+        let resp = service.handle_mcp_request(&session_id, McpRequest::DeleteData(crate::mcp::DeleteDataRequest {
+            id: "x".to_string(), hard_delete: None,
+        })).await;
+        assert!(resp.error.is_none());
     }
 }
