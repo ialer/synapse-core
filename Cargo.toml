@@ -61,6 +61,7 @@ ring = "0.17"
 
 # 工具库
 uuid = { version = "1.0", features = ["v4", "serde"] }
+hex = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1.0"
 anyhow = "1.0"

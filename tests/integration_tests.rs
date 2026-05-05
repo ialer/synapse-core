@@ -106,11 +106,11 @@ async fn test_e2e_delete_data() {
         .await
         .unwrap();
     let id = entity.id.to_string();
-    assert_eq!(app.get_data_count(), 1);
+    assert_eq!(app.get_data_count(&token).await.unwrap(), 1);
 
     // 删除
     app.secure_delete(&token, &id).await.unwrap();
-    assert_eq!(app.get_data_count(), 0);
+    assert_eq!(app.get_data_count(&token).await.unwrap(), 0);
 
     // 删除后不应能获取
     let result = app.secure_get(&token, &id).await;
@@ -187,10 +187,10 @@ async fn test_e2e_search_workflow() {
     .unwrap();
 
     // 搜索
-    let results = app.search("github", 10);
+    let results = app.search(&token, "github", 10).await.unwrap();
     assert_eq!(results.len(), 1, "应找到 1 条 github 相关数据");
 
-    let results = app.search("token", 10);
+    let results = app.search(&token, "token", 10).await.unwrap();
     assert!(results.len() >= 1, "应找到 token 相关数据");
 
     // 标签搜索
@@ -227,7 +227,7 @@ async fn test_e2e_all_data_types() {
         assert!(!entity.id.to_string().is_empty());
     }
 
-    assert_eq!(app.get_data_count(), 5);
+    assert_eq!(app.get_data_count(&token).await.unwrap(), 5);
 }
 
 // ===========================================================================
@@ -252,11 +252,11 @@ async fn test_e2e_list_data() {
     }
 
     // 列出所有
-    let all = app.list_all_data();
+    let all = app.list_all_data(&token).await.unwrap();
     assert_eq!(all.len(), 5, "应列出 5 条数据");
 
     // 统计
-    assert_eq!(app.get_data_count(), 5);
+    assert_eq!(app.get_data_count(&token).await.unwrap(), 5);
 }
 
 // ===========================================================================
@@ -267,9 +267,13 @@ async fn test_e2e_list_data() {
 async fn test_e2e_messaging() {
     let (mut app, _dir) = create_test_app().await;
 
-    // 发送消息
-    app.send_message("token_a", "bob", "Greeting", "Hello Bob!").unwrap();
-    app.send_message("token_b", "alice", "Reply", "Hi Alice!").unwrap();
+    // 注册用户获取真实 token
+    let token_a = app.register("alice", "pass1").await.unwrap();
+    let token_b = app.register("bob", "pass2").await.unwrap();
+
+    // 发送消息（需要认证）
+    app.send_message(&token_a, "bob", "Greeting", "Hello Bob!").await.unwrap();
+    app.send_message(&token_b, "alice", "Reply", "Hi Alice!").await.unwrap();
 
     // 获取消息
     let messages = app.get_messages("bob", 10);
@@ -310,11 +314,11 @@ async fn test_e2e_persistence() {
             .unwrap();
         app.init().await.unwrap();
 
-        // 数据应已加载
-        assert_eq!(app.get_data_count(), 1);
-
-        // 用户应已加载
+        // 数据应已加载 - 先登录获取 token
         let token = app.login("persist_user", "pass123").await.unwrap();
+        assert_eq!(app.get_data_count(&token).await.unwrap(), 1);
+
+        // search_by_tag is still public (no auth needed for tag search)
         let results = app.search_by_tag("persistent", 10);
         assert_eq!(results.len(), 1);
     }

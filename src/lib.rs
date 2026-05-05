@@ -107,7 +107,7 @@ mod tests {
         app.secure_delete(&token, &entity.id.to_string())
             .await
             .unwrap();
-        assert_eq!(app.get_data_count(), 0);
+        assert_eq!(app.get_data_count(&token).await.unwrap(), 0);
     }
 
     #[tokio::test]
@@ -128,7 +128,7 @@ mod tests {
         .await
         .unwrap();
 
-        let results = app.search("github", 10);
+        let results = app.search(&token, "github", 10).await.unwrap();
         assert_eq!(results.len(), 1);
     }
 

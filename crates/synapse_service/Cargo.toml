@@ -12,6 +12,8 @@ async-trait = { workspace = true }
 thiserror = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
+hex = { workspace = true }
+ring = { workspace = true }
 rmp-serde = { workspace = true }
 tempfile = "3"
 

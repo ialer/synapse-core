@@ -129,6 +129,7 @@ struct DataDetailResponse {
 
 #[derive(Deserialize)]
 struct SearchQuery {
+    token: String,
     q: String,
     #[serde(default = "default_limit")]
     limit: usize,
@@ -307,13 +308,12 @@ async fn list_data(
     Query(q): Query<ListDataQuery>,
 ) -> impl IntoResponse {
     let app = state.app.lock().await;
-    // Verify token first
-    if app.verify_token(&q.token).await.is_err() {
-        return error_response(StatusCode::UNAUTHORIZED, "Invalid token").into_response();
-    }
 
-    let all_items: Vec<DataItemResponse> = app
-        .list_all_data()
+    let all_items = match app.list_all_data(&q.token).await {
+        Ok(items) => items,
+        Err(e) => return error_response(StatusCode::UNAUTHORIZED, &e.to_string()).into_response(),
+    };
+    let all_items: Vec<DataItemResponse> = all_items
         .into_iter()
         .map(|info| DataItemResponse {
             id: info.id,
@@ -372,7 +372,7 @@ async fn delete_data(
 async fn search(
     State(state): State<SharedState>,
     Query(q): Query<SearchQuery>,
-) -> Json<Vec<SearchItemResponse>> {
+) -> impl IntoResponse {
     let app = state.app.lock().await;
 
     // If tag filter is provided, search by tag via proper accessor
@@ -389,11 +389,14 @@ async fn search(
                 ]),
             })
             .collect();
-        return Json(items);
+        return Json(items).into_response();
     }
 
     // Default: full-text search via indexer
-    let results = app.search(&q.q, q.limit);
+    let results = match app.search(&q.token, &q.q, q.limit).await {
+        Ok(r) => r,
+        Err(e) => return error_response(StatusCode::UNAUTHORIZED, &e.to_string()).into_response(),
+    };
     let items: Vec<SearchItemResponse> = results
         .into_iter()
         .map(|e| SearchItemResponse {
@@ -402,7 +405,7 @@ async fn search(
             metadata: e.metadata,
         })
         .collect();
-    Json(items)
+    Json(items).into_response()
 }
 
 // POST /api/messages
@@ -411,7 +414,7 @@ async fn send_message(
     Json(req): Json<SendMessageRequest>,
 ) -> impl IntoResponse {
     let mut app = state.app.lock().await;
-    match app.send_message(&req.token, &req.recipient_id, &req.title, &req.content) {
+    match app.send_message(&req.token, &req.recipient_id, &req.title, &req.content).await {
         Ok(_) => Json(SuccessResponse { success: true }).into_response(),
         Err(e) => error_response(StatusCode::BAD_REQUEST, &e.to_string()).into_response(),
     }

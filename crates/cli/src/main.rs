@@ -91,14 +91,14 @@ async fn main() -> anyhow::Result<()> {
             println!("内容: {}", String::from_utf8_lossy(&decrypted));
             println!("标签: {:?}", entity.tags);
         }
-        Commands::List { token: _ } => {
-            let items = app.list_all_data();
+        Commands::List { token } => {
+            let items = app.list_all_data(&token).await.unwrap_or_default();
             for item in &items {
                 println!("{} [{}] tags:{:?}", item.id, item.data_type, item.tags);
             }
         }
-        Commands::Search { token: _, query } => {
-            let results = app.search(&query, 20);
+        Commands::Search { token, query } => {
+            let results = app.search(&token, &query, 20).await.unwrap_or_default();
             for r in &results {
                 println!("{}: {}", r.id, r.content);
             }
