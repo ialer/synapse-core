@@ -1,5 +1,5 @@
 //! 同步逻辑模块
-//! 
+//!
 //! 实现多设备数据同步与冲突解决。
 
 use chrono::{DateTime, Utc};
@@ -23,22 +23,22 @@ pub enum SyncOperation {
 pub struct SyncRecord {
     /// 记录 ID
     pub id: String,
-    
+
     /// 数据 ID
     pub data_id: String,
-    
+
     /// 操作类型
     pub operation: SyncOperation,
-    
+
     /// 操作时间
     pub timestamp: DateTime<Utc>,
-    
+
     /// 设备 ID
     pub device_id: String,
-    
+
     /// 版本号
     pub version: u64,
-    
+
     /// 操作数据
     pub data: Option<Vec<u8>>,
 }
@@ -61,7 +61,7 @@ impl SyncRecord {
             data: None,
         }
     }
-    
+
     /// 设置操作数据
     pub fn with_data(mut self, data: Vec<u8>) -> Self {
         self.data = Some(data);
@@ -74,13 +74,13 @@ impl SyncRecord {
 pub struct SyncState {
     /// 设备 ID
     pub device_id: String,
-    
+
     /// 最后同步时间
     pub last_sync: DateTime<Utc>,
-    
+
     /// 最后同步版本
     pub last_version: u64,
-    
+
     /// 同步状态
     pub status: SyncStatus,
 }
@@ -102,7 +102,7 @@ pub enum SyncStatus {
 pub struct SyncEngine {
     /// 设备 ID
     device_id: String,
-    
+
     /// 同步状态
     state: SyncState,
 }
@@ -121,13 +121,9 @@ impl SyncEngine {
             },
         }
     }
-    
+
     /// 检测冲突
-    pub fn detect_conflict(
-        &self,
-        local_version: u64,
-        remote_version: u64,
-    ) -> Option<SyncError> {
+    pub fn detect_conflict(&self, local_version: u64, remote_version: u64) -> Option<SyncError> {
         if local_version > 0 && remote_version > 0 && local_version != remote_version {
             Some(SyncError::VersionConflict {
                 local: local_version,
@@ -137,7 +133,7 @@ impl SyncEngine {
             None
         }
     }
-    
+
     /// 解决冲突（最后写入者胜出）
     pub fn resolve_conflict_lww(
         &self,
@@ -146,16 +142,12 @@ impl SyncEngine {
     ) -> bool {
         remote_timestamp > local_timestamp
     }
-    
+
     /// 解决冲突（版本号更高者胜出）
-    pub fn resolve_conflict_version(
-        &self,
-        local_version: u64,
-        remote_version: u64,
-    ) -> bool {
+    pub fn resolve_conflict_version(&self, local_version: u64, remote_version: u64) -> bool {
         remote_version > local_version
     }
-    
+
     /// 生成同步记录
     pub fn create_sync_record(
         &self,
@@ -165,19 +157,19 @@ impl SyncEngine {
     ) -> SyncRecord {
         SyncRecord::new(data_id, operation, &self.device_id, version)
     }
-    
+
     /// 更新同步状态
     pub fn update_state(&mut self, version: u64) {
         self.state.last_sync = Utc::now();
         self.state.last_version = version;
         self.state.status = SyncStatus::Idle;
     }
-    
+
     /// 获取设备 ID
     pub fn device_id(&self) -> &str {
         &self.device_id
     }
-    
+
     /// 获取同步状态
     pub fn state(&self) -> &SyncState {
         &self.state
@@ -198,11 +190,11 @@ mod tests {
     #[test]
     fn test_conflict_detection() {
         let engine = SyncEngine::new("device-1");
-        
+
         // 无冲突
         assert!(engine.detect_conflict(0, 0).is_none());
         assert!(engine.detect_conflict(1, 1).is_none());
-        
+
         // 有冲突
         assert!(engine.detect_conflict(1, 2).is_some());
         assert!(engine.detect_conflict(2, 1).is_some());
@@ -211,13 +203,13 @@ mod tests {
     #[test]
     fn test_conflict_resolution_lww() {
         let engine = SyncEngine::new("device-1");
-        
+
         let local_time = Utc::now();
         let remote_time = local_time + chrono::Duration::hours(1);
-        
+
         // 远程更新，应使用远程
         assert!(engine.resolve_conflict_lww(local_time, remote_time));
-        
+
         // 本地更新，应使用本地
         assert!(!engine.resolve_conflict_lww(remote_time, local_time));
     }
@@ -225,10 +217,10 @@ mod tests {
     #[test]
     fn test_conflict_resolution_version() {
         let engine = SyncEngine::new("device-1");
-        
+
         // 远程版本更高
         assert!(engine.resolve_conflict_version(1, 2));
-        
+
         // 本地版本更高
         assert!(!engine.resolve_conflict_version(2, 1));
     }
@@ -237,7 +229,7 @@ mod tests {
     fn test_sync_record_creation() {
         let engine = SyncEngine::new("device-1");
         let record = engine.create_sync_record("data-1", SyncOperation::Create, 1);
-        
+
         assert_eq!(record.data_id, "data-1");
         assert_eq!(record.operation, SyncOperation::Create);
         assert_eq!(record.device_id, "device-1");

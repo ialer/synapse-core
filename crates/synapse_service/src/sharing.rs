@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use data_core::{DataId, OwnerId, PermissionLevel};
-use messaging_service::{Message, MessageType, MessagePriority};
+use messaging_service::{Message, MessagePriority, MessageType};
 
 /// 共享请求状态
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -156,20 +156,12 @@ impl ShareManager {
 
         let title = format!("共享请求 - {}", data_id);
         let content = message_text.unwrap_or_else(|| {
-            format!(
-                "用户 {} 请求以 {:?} 权限访问数据 {}",
-                from, level, data_id
-            )
+            format!("用户 {} 请求以 {:?} 权限访问数据 {}", from, level, data_id)
         });
 
-        let notification = Message::new(
-            from.to_string(),
-            to.to_string(),
-            title,
-            content,
-        )
-        .with_type(MessageType::Notification)
-        .with_priority(MessagePriority::Normal);
+        let notification = Message::new(from.to_string(), to.to_string(), title, content)
+            .with_type(MessageType::Notification)
+            .with_priority(MessagePriority::Normal);
 
         (request, notification)
     }
@@ -199,23 +191,14 @@ impl ShareManager {
                 )
             };
 
-            let request = self
-                .requests
-                .iter()
-                .find(|r| r.id == *request_id)
-                .cloned();
+            let request = self.requests.iter().find(|r| r.id == *request_id).cloned();
             let recipient_id = request
                 .map(|r| r.from_user.to_string())
                 .unwrap_or_else(|| "unknown".to_string());
 
-            let notification = Message::new(
-                responder_id.to_string(),
-                recipient_id,
-                title,
-                content,
-            )
-            .with_type(MessageType::Notification)
-            .with_priority(MessagePriority::Normal);
+            let notification = Message::new(responder_id.to_string(), recipient_id, title, content)
+                .with_type(MessageType::Notification)
+                .with_priority(MessagePriority::Normal);
 
             (grant, notification)
         } else {
@@ -233,23 +216,14 @@ impl ShareManager {
                 )
             };
 
-            let request = self
-                .requests
-                .iter()
-                .find(|r| r.id == *request_id)
-                .cloned();
+            let request = self.requests.iter().find(|r| r.id == *request_id).cloned();
             let recipient_id = request
                 .map(|r| r.from_user.to_string())
                 .unwrap_or_else(|| "unknown".to_string());
 
-            let notification = Message::new(
-                responder_id.to_string(),
-                recipient_id,
-                title,
-                content,
-            )
-            .with_type(MessageType::Notification)
-            .with_priority(MessagePriority::Normal);
+            let notification = Message::new(responder_id.to_string(), recipient_id, title, content)
+                .with_type(MessageType::Notification)
+                .with_priority(MessagePriority::Normal);
 
             (None, notification)
         }
@@ -320,8 +294,15 @@ impl ShareGrant {
 
 /// 检查权限级别是否满足所需级别
 pub fn permission_meets(granted: PermissionLevel, required: PermissionLevel) -> bool {
-    matches!((granted, required),
-        (PermissionLevel::Admin, _) | (PermissionLevel::Edit, PermissionLevel::Edit | PermissionLevel::View) | (PermissionLevel::View, PermissionLevel::View))
+    matches!(
+        (granted, required),
+        (PermissionLevel::Admin, _)
+            | (
+                PermissionLevel::Edit,
+                PermissionLevel::Edit | PermissionLevel::View
+            )
+            | (PermissionLevel::View, PermissionLevel::View)
+    )
 }
 
 #[cfg(test)]
@@ -358,15 +339,11 @@ mod tests {
         let owner = Uuid::new_v4();
         let requester = Uuid::new_v4();
 
-        let req = mgr.request_share(
-            data_id,
-            requester,
-            owner,
-            PermissionLevel::Edit,
-            None,
-        );
+        let req = mgr.request_share(data_id, requester, owner, PermissionLevel::Edit, None);
 
-        let grant = mgr.approve_request(&req.id, None).expect("approval should succeed");
+        let grant = mgr
+            .approve_request(&req.id, None)
+            .expect("approval should succeed");
 
         assert_eq!(grant.data_id, data_id);
         assert_eq!(grant.owner_id, owner);
@@ -685,11 +662,11 @@ mod tests {
         assert_eq!(notification.recipient_id, to.to_string());
         assert!(notification.title.contains(&data_id.to_string()));
         assert_eq!(notification.content, "请共享数据");
-        assert!(matches!(notification.message_type, MessageType::Notification));
         assert!(matches!(
-            notification.priority,
-            MessagePriority::Normal
+            notification.message_type,
+            MessageType::Notification
         ));
+        assert!(matches!(notification.priority, MessagePriority::Normal));
         assert!(!notification.is_read());
     }
 
@@ -700,13 +677,8 @@ mod tests {
         let from = Uuid::new_v4();
         let to = Uuid::new_v4();
 
-        let (_request, notification) = mgr.create_share_request_with_message(
-            data_id,
-            from,
-            to,
-            PermissionLevel::Edit,
-            None,
-        );
+        let (_request, notification) =
+            mgr.create_share_request_with_message(data_id, from, to, PermissionLevel::Edit, None);
 
         // When no custom message, default content should contain from user and level
         assert!(notification.content.contains(&from.to_string()));
@@ -720,13 +692,7 @@ mod tests {
         let requester = Uuid::new_v4();
         let owner = Uuid::new_v4();
 
-        let req = mgr.request_share(
-            data_id,
-            requester,
-            owner,
-            PermissionLevel::View,
-            None,
-        );
+        let req = mgr.request_share(data_id, requester, owner, PermissionLevel::View, None);
 
         let (grant, notification) = mgr.respond_to_request(&req.id, true, owner);
 
@@ -742,7 +708,10 @@ mod tests {
         assert_eq!(notification.recipient_id, requester.to_string());
         assert!(notification.title.contains("批准"));
         assert!(notification.content.contains("批准"));
-        assert!(matches!(notification.message_type, MessageType::Notification));
+        assert!(matches!(
+            notification.message_type,
+            MessageType::Notification
+        ));
     }
 
     #[test]
@@ -752,13 +721,7 @@ mod tests {
         let requester = Uuid::new_v4();
         let owner = Uuid::new_v4();
 
-        let req = mgr.request_share(
-            data_id,
-            requester,
-            owner,
-            PermissionLevel::View,
-            None,
-        );
+        let req = mgr.request_share(data_id, requester, owner, PermissionLevel::View, None);
 
         let (grant, notification) = mgr.respond_to_request(&req.id, false, owner);
 
@@ -774,7 +737,10 @@ mod tests {
         assert_eq!(notification.recipient_id, requester.to_string());
         assert!(notification.title.contains("拒绝"));
         assert!(notification.content.contains("拒绝"));
-        assert!(matches!(notification.message_type, MessageType::Notification));
+        assert!(matches!(
+            notification.message_type,
+            MessageType::Notification
+        ));
     }
 
     #[test]

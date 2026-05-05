@@ -6,7 +6,7 @@ struct Cli {
     /// 数据目录
     #[arg(short, long, default_value = "./data")]
     data_dir: String,
-    
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -18,7 +18,7 @@ enum Commands {
     /// 登录
     Login { username: String, password: String },
     /// 存储数据
-    Store { 
+    Store {
         #[arg(short = 'T', long)]
         token: String,
         #[arg(short, long)]
@@ -66,7 +66,7 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let mut app = synapse_service::SynapseApp::new_local(&cli.data_dir).await?;
     app.init().await?;
-    
+
     match cli.command {
         Commands::Register { username, password } => {
             let token = app.register(&username, &password).await?;
@@ -78,9 +78,17 @@ async fn main() -> anyhow::Result<()> {
             println!("登录成功");
             println!("Token: {}", token);
         }
-        Commands::Store { token, data_type, content, tags } => {
-            let dt = data_core::DataType::parse_type(&data_type).unwrap_or(data_core::DataType::Generic);
-            let entity = app.secure_store(&token, dt, content.into_bytes(), tags).await?;
+        Commands::Store {
+            token,
+            data_type,
+            content,
+            tags,
+        } => {
+            let dt =
+                data_core::DataType::parse_type(&data_type).unwrap_or(data_core::DataType::Generic);
+            let entity = app
+                .secure_store(&token, dt, content.into_bytes(), tags)
+                .await?;
             println!("存储成功");
             println!("ID: {}", entity.id);
         }
@@ -114,23 +122,27 @@ async fn main() -> anyhow::Result<()> {
             println!("消息: {} 条", stats.message_count);
         }
     }
-    
+
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use clap::Parser;
     use super::{Cli, Commands};
+    use clap::Parser;
 
     #[test]
     fn test_cli_parse_register() {
         let cli = Cli::try_parse_from([
             "synapse",
-            "--data-dir", "/tmp/test",
-            "register", "alice", "secret123",
-        ]).unwrap();
-        
+            "--data-dir",
+            "/tmp/test",
+            "register",
+            "alice",
+            "secret123",
+        ])
+        .unwrap();
+
         assert_eq!(cli.data_dir, "/tmp/test");
         match cli.command {
             Commands::Register { username, password } => {
@@ -146,14 +158,25 @@ mod tests {
         let cli = Cli::try_parse_from([
             "synapse",
             "store",
-            "-T", "my-token",
-            "-d", "credential",
-            "-c", "github_pat_xxx",
-            "-t", "github", "token",
-        ]).unwrap();
-        
+            "-T",
+            "my-token",
+            "-d",
+            "credential",
+            "-c",
+            "github_pat_xxx",
+            "-t",
+            "github",
+            "token",
+        ])
+        .unwrap();
+
         match cli.command {
-            Commands::Store { token, data_type, content, tags } => {
+            Commands::Store {
+                token,
+                data_type,
+                content,
+                tags,
+            } => {
                 assert_eq!(token, "my-token");
                 assert_eq!(data_type, "credential");
                 assert_eq!(content, "github_pat_xxx");
@@ -165,11 +188,8 @@ mod tests {
 
     #[test]
     fn test_cli_parse_default_data_dir() {
-        let cli = Cli::try_parse_from([
-            "synapse",
-            "stats", "-t", "tok",
-        ]).unwrap();
-        
+        let cli = Cli::try_parse_from(["synapse", "stats", "-t", "tok"]).unwrap();
+
         assert_eq!(cli.data_dir, "./data");
     }
 }

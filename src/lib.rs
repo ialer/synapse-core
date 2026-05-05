@@ -16,11 +16,9 @@
 //! - 统一应用入口 (synapse_service → SynapseApp)
 
 // Re-export synapse_service as the single high-level API
-pub use synapse_service::SynapseApp;
 pub use synapse_service::error;
-pub use synapse_service::{
-    DataItemInfo, ServiceStats, StorageType, SynapseService,
-};
+pub use synapse_service::SynapseApp;
+pub use synapse_service::{DataItemInfo, ServiceStats, StorageType, SynapseService};
 
 // Re-export sub-crates as modules for convenience
 pub mod data_core {
@@ -81,7 +79,10 @@ mod tests {
             .unwrap();
 
         // Get data back
-        let retrieved = app.secure_get(&token, &entity.id.to_string()).await.unwrap();
+        let retrieved = app
+            .secure_get(&token, &entity.id.to_string())
+            .await
+            .unwrap();
         assert_eq!(retrieved.id, entity.id);
     }
 

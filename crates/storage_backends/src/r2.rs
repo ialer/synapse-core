@@ -183,24 +183,14 @@ mod tests {
 
     #[test]
     fn test_r2_backend_creation() {
-        let result = R2Backend::new(
-            "test-account-id",
-            "test-bucket",
-            "access-key",
-            "secret-key",
-        );
+        let result = R2Backend::new("test-account-id", "test-bucket", "access-key", "secret-key");
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_r2_backend_endpoint() {
-        let backend = R2Backend::new(
-            "test-account-id",
-            "test-bucket",
-            "access-key",
-            "secret-key",
-        )
-        .unwrap();
+        let backend =
+            R2Backend::new("test-account-id", "test-bucket", "access-key", "secret-key").unwrap();
         assert_eq!(
             backend.endpoint(),
             "https://test-account-id.r2.cloudflarestorage.com"

@@ -1,23 +1,23 @@
 //! 统一网关服务模块
-//! 
+//!
 //! 整合 IAM、Storage 和 Data 核心，对外提供统一的 API 接口。
 
 pub mod error;
-pub mod sharing;
 pub mod pipeline;
+pub mod sharing;
 
+use async_trait::async_trait;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use std::collections::HashMap;
-use async_trait::async_trait;
 
 use crate::error::{SynapseError, SynapseResult};
-use agent_interface::{DataProvider, SearchEntry, ListEntry};
-use data_core::{DataEntity, DataType, Cipher};
-use iam_core::{AuthService, JwtConfig, DiskAuthService, MemoryAuthService};
-use storage_backends::{StorageBackend, LocalBackend};
-use search_indexer::Indexer;
+use agent_interface::{DataProvider, ListEntry, SearchEntry};
+use data_core::{Cipher, DataEntity, DataType};
+use iam_core::{AuthService, DiskAuthService, JwtConfig, MemoryAuthService};
 use messaging_service::{MessageService, NotificationManager};
+use search_indexer::Indexer;
+use storage_backends::{LocalBackend, StorageBackend};
 
 /// 存储后端类型
 pub enum StorageType {
@@ -84,23 +84,23 @@ pub enum StorageType {
 pub struct SynapseApp {
     /// 认证服务
     auth: Box<dyn AuthService>,
-    
+
     /// 存储后端
     storage: Box<dyn StorageBackend>,
-    
+
     /// 加密器
     cipher: Cipher,
-    
+
     /// 索引器
     indexer: Indexer,
-    
+
     /// 消息服务
     message_service: MessageService,
-    
+
     /// 通知管理器 (预留)
     #[allow(dead_code)]
     notification_manager: NotificationManager,
-    
+
     /// 数据存储（内存版本，内部使用）
     data_store: HashMap<String, DataEntity>,
 }
@@ -111,7 +111,8 @@ impl SynapseApp {
         use ring::rand::{SecureRandom, SystemRandom};
         let rng = SystemRandom::new();
         let mut bytes = [0u8; 32];
-        rng.fill(&mut bytes).expect("Failed to generate random secret");
+        rng.fill(&mut bytes)
+            .expect("Failed to generate random secret");
         hex::encode(bytes)
     }
 
@@ -122,7 +123,7 @@ impl SynapseApp {
         let auth = Box::new(DiskAuthService::new(jwt_config, secret, storage_path).await);
         let storage = Box::new(LocalBackend::new(storage_path));
         let cipher = Cipher::new()?;
-        
+
         Ok(Self {
             auth,
             storage,
@@ -133,7 +134,7 @@ impl SynapseApp {
             data_store: HashMap::new(),
         })
     }
-    
+
     /// 创建新的 SynapseApp（WebDAV 存储）
     pub fn new_webdav(
         endpoint: &str,
@@ -153,7 +154,7 @@ impl SynapseApp {
             )?),
         };
         let cipher = Cipher::new()?;
-        
+
         Ok(Self {
             auth,
             storage,
@@ -164,7 +165,7 @@ impl SynapseApp {
             data_store: HashMap::new(),
         })
     }
-    
+
     /// 创建新的 SynapseApp（S3/MinIO 存储）
     pub fn new_s3(
         endpoint: &str,
@@ -177,7 +178,7 @@ impl SynapseApp {
         let jwt_config = JwtConfig::default();
         let secret = Self::generate_secret();
         let auth = Box::new(MemoryAuthService::new(jwt_config, secret));
-        
+
         let storage: Box<dyn StorageBackend> = match (region, root) {
             (Some(r), Some(rt)) => Box::new(storage_backends::S3Backend::with_config(
                 endpoint, bucket, access_key, secret_key, r, rt,
@@ -192,9 +193,9 @@ impl SynapseApp {
                 endpoint, bucket, access_key, secret_key,
             )?),
         };
-        
+
         let cipher = Cipher::new()?;
-        
+
         Ok(Self {
             auth,
             storage,
@@ -205,7 +206,7 @@ impl SynapseApp {
             data_store: HashMap::new(),
         })
     }
-    
+
     /// 创建新的 SynapseApp（阿里云 OSS 存储）
     pub fn new_oss(
         endpoint: &str,
@@ -217,7 +218,7 @@ impl SynapseApp {
         let jwt_config = JwtConfig::default();
         let secret = Self::generate_secret();
         let auth = Box::new(MemoryAuthService::new(jwt_config, secret));
-        
+
         let storage: Box<dyn StorageBackend> = match region {
             Some(r) => Box::new(storage_backends::OssBackend::with_region(
                 endpoint, bucket, access_key, secret_key, r,
@@ -226,9 +227,9 @@ impl SynapseApp {
                 endpoint, bucket, access_key, secret_key,
             )?),
         };
-        
+
         let cipher = Cipher::new()?;
-        
+
         Ok(Self {
             auth,
             storage,
@@ -239,7 +240,7 @@ impl SynapseApp {
             data_store: HashMap::new(),
         })
     }
-    
+
     /// 创建新的 SynapseApp（Cloudflare R2 存储）
     pub fn new_r2(
         account_id: &str,
@@ -251,7 +252,7 @@ impl SynapseApp {
         let jwt_config = JwtConfig::default();
         let secret = Self::generate_secret();
         let auth = Box::new(MemoryAuthService::new(jwt_config, secret));
-        
+
         let storage: Box<dyn StorageBackend> = match root {
             Some(r) => Box::new(storage_backends::R2Backend::with_root(
                 account_id, bucket, access_key, secret_key, r,
@@ -260,9 +261,9 @@ impl SynapseApp {
                 account_id, bucket, access_key, secret_key,
             )?),
         };
-        
+
         let cipher = Cipher::new()?;
-        
+
         Ok(Self {
             auth,
             storage,
@@ -273,14 +274,14 @@ impl SynapseApp {
             data_store: HashMap::new(),
         })
     }
-    
+
     /// 创建新的 SynapseApp（通用存储后端）
     pub fn new_with_storage(
         auth: Box<dyn AuthService>,
         storage: Box<dyn StorageBackend>,
     ) -> SynapseResult<Self> {
         let cipher = Cipher::new()?;
-        
+
         Ok(Self {
             auth,
             storage,
@@ -291,13 +292,13 @@ impl SynapseApp {
             data_store: HashMap::new(),
         })
     }
-    
+
     /// 用户登录
     pub async fn login(&self, username: &str, password: &str) -> SynapseResult<String> {
         let result = self.auth.login(username, password).await?;
         Ok(result.access_token)
     }
-    
+
     /// 存储加密数据
     pub async fn secure_store(
         &mut self,
@@ -308,20 +309,20 @@ impl SynapseApp {
     ) -> SynapseResult<DataEntity> {
         // 1. 验证权限
         let claims = self.auth.verify_token(token).await?;
-        
+
         // 2. 加密数据
         let encrypted = self.cipher.encrypt(&data, None)?;
-        
+
         // 3. 创建数据实体
         let owner_id = uuid::Uuid::parse_str(&claims.sub)
             .map_err(|e| SynapseError::Internal(e.to_string()))?;
         let mut entity = DataEntity::new(owner_id, data_type, encrypted);
         entity = entity.with_tags(tags.clone());
-        
+
         // 4. 存储数据
         let key = format!("data/{}", entity.id);
         self.storage.save(&key, &entity.to_msgpack()?).await?;
-        
+
         // 5. 更新索引
         let entry = search_indexer::IndexEntry {
             id: entity.id.to_string(),
@@ -332,71 +333,83 @@ impl SynapseApp {
             ]),
         };
         self.indexer.add_entry(entry);
-        
+
         // 6. 存储到内存
-        self.data_store.insert(entity.id.to_string(), entity.clone());
-        
+        self.data_store
+            .insert(entity.id.to_string(), entity.clone());
+
         Ok(entity)
     }
-    
+
     /// 获取数据
     pub async fn secure_get(&self, token: &str, id: &str) -> SynapseResult<DataEntity> {
         // 1. 验证权限
         let claims = self.auth.verify_token(token).await?;
-        
+
         // 2. 获取数据
         let key = format!("data/{}", id);
         let data = self.storage.load(&key).await?;
         let entity = DataEntity::from_msgpack(&data)?;
-        
+
         // 3. 检查所有权
         if entity.owner_id.to_string() != claims.sub {
             return Err(SynapseError::PermissionDenied("Not owner".to_string()));
         }
-        
+
         Ok(entity)
     }
 
     /// 获取并解密数据
-    pub async fn secure_get_decrypted(&self, token: &str, id: &str) -> SynapseResult<(DataEntity, Vec<u8>)> {
+    pub async fn secure_get_decrypted(
+        &self,
+        token: &str,
+        id: &str,
+    ) -> SynapseResult<(DataEntity, Vec<u8>)> {
         let entity = self.secure_get(token, id).await?;
         let decrypted = self.cipher.decrypt(&entity.encrypted_content, None)?;
         Ok((entity, decrypted))
     }
-    
+
     /// 搜索数据（需要认证）
-    pub async fn search(&self, token: &str, query: &str, limit: usize) -> SynapseResult<Vec<search_indexer::IndexEntry>> {
+    pub async fn search(
+        &self,
+        token: &str,
+        query: &str,
+        limit: usize,
+    ) -> SynapseResult<Vec<search_indexer::IndexEntry>> {
         // 验证 token
         let _claims = self.auth.verify_token(token).await?;
-        Ok(self.indexer.search(query, limit)
+        Ok(self
+            .indexer
+            .search(query, limit)
             .into_iter()
             .cloned()
             .collect())
     }
-    
+
     /// 删除数据
     pub async fn secure_delete(&mut self, token: &str, id: &str) -> SynapseResult<()> {
         // 1. 验证权限
         let claims = self.auth.verify_token(token).await?;
-        
+
         // 2. 检查数据是否存在
         let key = format!("data/{}", id);
         let data = self.storage.load(&key).await?;
         let entity = DataEntity::from_msgpack(&data)?;
-        
+
         // 3. 检查所有权
         if entity.owner_id.to_string() != claims.sub {
             return Err(SynapseError::PermissionDenied("Not owner".to_string()));
         }
-        
+
         // 4. 删除数据
         self.storage.delete(&key).await?;
         self.indexer.remove_entry(id);
         self.data_store.remove(id);
-        
+
         Ok(())
     }
-    
+
     /// 发送消息（需要认证）
     pub async fn send_message(
         &mut self,
@@ -408,24 +421,20 @@ impl SynapseApp {
         // 验证 token 并获取发送者 ID
         let claims = self.auth.verify_token(token).await?;
         let sender_id = &claims.sub;
-        let message = messaging_service::Message::new(
-            sender_id,
-            recipient_id,
-            title,
-            content,
-        );
+        let message = messaging_service::Message::new(sender_id, recipient_id, title, content);
         self.message_service.send_message(message);
         Ok(())
     }
-    
+
     /// 获取用户消息
     pub fn get_messages(&self, user_id: &str, limit: usize) -> Vec<messaging_service::Message> {
-        self.message_service.get_user_messages(user_id, limit)
+        self.message_service
+            .get_user_messages(user_id, limit)
             .into_iter()
             .cloned()
             .collect()
     }
-    
+
     /// 注册新用户
     pub async fn register(&mut self, username: &str, password: &str) -> SynapseResult<String> {
         // 通过认证服务注册并登录
@@ -522,7 +531,8 @@ impl SynapseApp {
     /// 列出所有数据的基本信息（不含加密内容，需要认证）
     pub async fn list_all_data(&self, token: &str) -> SynapseResult<Vec<DataItemInfo>> {
         let _claims = self.auth.verify_token(token).await?;
-        Ok(self.data_store
+        Ok(self
+            .data_store
             .values()
             .map(|entity| DataItemInfo {
                 id: entity.id.to_string(),
@@ -574,10 +584,10 @@ impl SynapseApp {
 pub struct ServiceStats {
     /// 数据数量
     pub data_count: usize,
-    
+
     /// 索引数量
     pub index_count: usize,
-    
+
     /// 消息数量
     pub message_count: usize,
 }
@@ -599,14 +609,19 @@ pub struct DataItemInfo {
 #[async_trait]
 pub trait SynapseService: Send + Sync {
     /// 存储数据
-    async fn store(&self, data_type: DataType, data: Vec<u8>, tags: Vec<String>) -> SynapseResult<String>;
-    
+    async fn store(
+        &self,
+        data_type: DataType,
+        data: Vec<u8>,
+        tags: Vec<String>,
+    ) -> SynapseResult<String>;
+
     /// 获取数据
     async fn get(&self, id: &str) -> SynapseResult<Vec<u8>>;
-    
+
     /// 删除数据
     async fn delete(&self, id: &str) -> SynapseResult<()>;
-    
+
     /// 搜索数据
     fn search(&self, query: &str, limit: usize) -> Vec<String>;
 }
@@ -646,13 +661,14 @@ impl DataProvider for AppDataProvider {
             Err(_) => return vec![],
         };
 
-        index_entries.into_iter().map(|entry| {
-            SearchEntry {
+        index_entries
+            .into_iter()
+            .map(|entry| SearchEntry {
                 id: entry.id,
                 content: entry.content,
                 metadata: entry.metadata,
-            }
-        }).collect()
+            })
+            .collect()
     }
 
     async fn get_data(
@@ -719,14 +735,15 @@ impl DataProvider for AppDataProvider {
             Ok(items) => items,
             Err(_) => return vec![],
         };
-        items.into_iter().map(|info| {
-            ListEntry {
+        items
+            .into_iter()
+            .map(|info| ListEntry {
                 id: info.id,
                 data_type: info.data_type,
                 tags: info.tags,
                 created_at: info.created_at,
-            }
-        }).collect()
+            })
+            .collect()
     }
 }
 
@@ -738,8 +755,10 @@ mod tests {
     #[tokio::test]
     async fn test_synapse_app_creation() {
         let temp_dir = TempDir::new().unwrap();
-        let app = SynapseApp::new_local(temp_dir.path().to_str().unwrap()).await.unwrap();
-        
+        let app = SynapseApp::new_local(temp_dir.path().to_str().unwrap())
+            .await
+            .unwrap();
+
         let stats = app.stats();
         assert_eq!(stats.data_count, 0);
     }
@@ -747,21 +766,28 @@ mod tests {
     #[tokio::test]
     async fn test_search() {
         let temp_dir = TempDir::new().unwrap();
-        let app = SynapseApp::new_local(temp_dir.path().to_str().unwrap()).await.unwrap();
+        let app = SynapseApp::new_local(temp_dir.path().to_str().unwrap())
+            .await
+            .unwrap();
 
         // Register a test user and get token
-        let token = app.login("testuser", "testpass").await.or_else(|_| {
-            // If login fails, register first
-            Ok::<String, crate::error::SynapseError>(String::new())
-        }).unwrap_or_default();
+        let token = app
+            .login("testuser", "testpass")
+            .await
+            .or_else(|_| {
+                // If login fails, register first
+                Ok::<String, crate::error::SynapseError>(String::new())
+            })
+            .unwrap_or_default();
 
         // For search test, use indexer directly (search requires auth)
         let entry = search_indexer::IndexEntry {
             id: "1".to_string(),
             content: "github token".to_string(),
-            metadata: std::collections::HashMap::from([
-                ("type".to_string(), "credential".to_string()),
-            ]),
+            metadata: std::collections::HashMap::from([(
+                "type".to_string(),
+                "credential".to_string(),
+            )]),
         };
         // Direct indexer test (bypasses auth for unit testing)
         // search is now auth-protected, tested via integration tests
@@ -772,15 +798,17 @@ mod tests {
     #[tokio::test]
     async fn test_stats() {
         let temp_dir = TempDir::new().unwrap();
-        let mut app = SynapseApp::new_local(temp_dir.path().to_str().unwrap()).await.unwrap();
-        
+        let mut app = SynapseApp::new_local(temp_dir.path().to_str().unwrap())
+            .await
+            .unwrap();
+
         let entry = search_indexer::IndexEntry {
             id: "1".to_string(),
             content: "test".to_string(),
             metadata: std::collections::HashMap::new(),
         };
         app.indexer.add_entry(entry);
-        
+
         let stats = app.stats();
         assert_eq!(stats.index_count, 1);
     }

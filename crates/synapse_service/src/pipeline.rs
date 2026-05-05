@@ -5,9 +5,9 @@
 //! Uses `tokio::sync::mpsc` for event notification and supports
 //! concurrent batch processing with configurable stages.
 
+use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::time::Instant;
-use std::sync::Arc;
 
 use crate::error::{SynapseError, SynapseResult};
 
@@ -21,9 +21,17 @@ pub enum PipelineEvent {
     /// 数据到达
     DataReceived { key: String, size: usize },
     /// 转换完成
-    Transformed { key: String, original_size: usize, transformed_size: usize },
+    Transformed {
+        key: String,
+        original_size: usize,
+        transformed_size: usize,
+    },
     /// 加密完成
-    Encrypted { key: String, original_size: usize, encrypted_size: usize },
+    Encrypted {
+        key: String,
+        original_size: usize,
+        encrypted_size: usize,
+    },
     /// 存储完成
     Stored { key: String },
     /// 索引更新
@@ -154,16 +162,17 @@ impl DataPipeline {
         }
 
         let duration_ms = start.elapsed().as_millis() as u64;
-        self.emit(PipelineEvent::Completed {
-            key,
-            duration_ms,
-        });
+        self.emit(PipelineEvent::Completed { key, duration_ms });
 
         Ok(())
     }
 
     /// 批量处理
-    pub async fn process_batch<F>(&self, items: Vec<(String, Vec<u8>)>, handler: F) -> Vec<SynapseResult<()>>
+    pub async fn process_batch<F>(
+        &self,
+        items: Vec<(String, Vec<u8>)>,
+        handler: F,
+    ) -> Vec<SynapseResult<()>>
     where
         F: Fn(&str, &[u8]) -> SynapseResult<Vec<u8>> + Send + Sync + Clone + 'static,
     {
@@ -179,10 +188,7 @@ impl DataPipeline {
             let event_tx = self.event_tx.clone();
 
             let handle = tokio::spawn(async move {
-                let pipeline = DataPipeline {
-                    config,
-                    event_tx,
-                };
+                let pipeline = DataPipeline { config, event_tx };
                 let result = pipeline.process(key, data, handler).await;
                 drop(permit); // release concurrency slot
                 result
@@ -194,7 +200,9 @@ impl DataPipeline {
         for handle in handles {
             match handle.await {
                 Ok(r) => results.push(r),
-                Err(e) => results.push(Err(SynapseError::Internal(format!("Task join error: {e}")))),
+                Err(e) => {
+                    results.push(Err(SynapseError::Internal(format!("Task join error: {e}"))))
+                }
             }
         }
         results
@@ -220,7 +228,10 @@ impl DataPipeline {
 
         // Transform
         let transformed = transform(&data).inspect_err(|e| {
-            self.emit(PipelineEvent::Failed { key: key.clone(), error: e.to_string() });
+            self.emit(PipelineEvent::Failed {
+                key: key.clone(),
+                error: e.to_string(),
+            });
         })?;
         self.emit(PipelineEvent::Transformed {
             key: key.clone(),
@@ -231,7 +242,10 @@ impl DataPipeline {
         // Encrypt
         let encrypted = if self.config.encrypt {
             let enc = encrypt(&transformed).inspect_err(|e| {
-                self.emit(PipelineEvent::Failed { key: key.clone(), error: e.to_string() });
+                self.emit(PipelineEvent::Failed {
+                    key: key.clone(),
+                    error: e.to_string(),
+                });
             })?;
             self.emit(PipelineEvent::Encrypted {
                 key: key.clone(),
@@ -245,14 +259,20 @@ impl DataPipeline {
 
         // Store
         store(&key, &encrypted).inspect_err(|e| {
-            self.emit(PipelineEvent::Failed { key: key.clone(), error: e.to_string() });
+            self.emit(PipelineEvent::Failed {
+                key: key.clone(),
+                error: e.to_string(),
+            });
         })?;
         self.emit(PipelineEvent::Stored { key: key.clone() });
 
         // Index
         if self.config.index {
             index(&key, &encrypted).inspect_err(|e| {
-                self.emit(PipelineEvent::Failed { key: key.clone(), error: e.to_string() });
+                self.emit(PipelineEvent::Failed {
+                    key: key.clone(),
+                    error: e.to_string(),
+                });
             })?;
             self.emit(PipelineEvent::Indexed { key: key.clone() });
         }

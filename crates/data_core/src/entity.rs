@@ -1,5 +1,5 @@
 //! 数据实体定义模块
-//! 
+//!
 //! 定义系统中所有数据实体的核心结构。
 
 use chrono::{DateTime, Utc};
@@ -83,15 +83,15 @@ impl std::fmt::Display for DataType {
 }
 
 /// 数据实体核心结构
-/// 
+///
 /// 包含数据的所有必要信息，支持加密存储。
-/// 
+///
 /// # 示例
-/// 
+///
 /// ```rust
 /// use data_core::{DataEntity, DataType};
 /// use uuid::Uuid;
-/// 
+///
 /// let entity = DataEntity::new(
 ///     Uuid::new_v4(),
 ///     DataType::Credential,
@@ -102,58 +102,58 @@ impl std::fmt::Display for DataType {
 pub struct DataEntity {
     /// 数据唯一标识
     pub id: DataId,
-    
+
     /// 所有者标识
     pub owner_id: OwnerId,
-    
+
     /// 数据类型
     pub data_type: DataType,
-    
+
     /// 加密后的数据内容
     pub encrypted_content: Vec<u8>,
-    
+
     /// 数据标签 (用于分类和搜索)
     pub tags: Vec<String>,
-    
+
     /// 创建时间
     pub created_at: DateTime<Utc>,
-    
+
     /// 最后修改时间
     pub updated_at: DateTime<Utc>,
-    
+
     /// 版本号 (用于乐观并发控制)
     pub version: u64,
-    
+
     /// 是否已删除 (软删除标记)
     pub is_deleted: bool,
-    
+
     /// 共享权限列表
     pub shared_with: Vec<SharePermission>,
-    
+
     /// 文件夹路径 (用于分类)
     pub folder: Option<String>,
-    
+
     /// MIME 类型
     pub content_type: Option<String>,
-    
+
     /// 数据校验和
     pub checksum: Option<String>,
-    
+
     /// 扩展元数据
     pub metadata: std::collections::HashMap<String, String>,
 }
 
 impl DataEntity {
     /// 创建新的数据实体
-    /// 
+    ///
     /// # 参数
-    /// 
+    ///
     /// * `owner_id` - 所有者标识
     /// * `data_type` - 数据类型
     /// * `encrypted_content` - 加密后的内容
-    /// 
+    ///
     /// # 返回
-    /// 
+    ///
     /// 新创建的数据实体，自动设置ID、时间戳和版本号
     pub fn new(owner_id: OwnerId, data_type: DataType, encrypted_content: Vec<u8>) -> Self {
         let now = Utc::now();
@@ -278,8 +278,15 @@ impl DataEntity {
         }
         self.shared_with.iter().any(|p| {
             p.user_id == *user_id
-                && matches!((p.level, level),
-                    (PermissionLevel::Admin, _) | (PermissionLevel::Edit, PermissionLevel::Edit | PermissionLevel::View) | (PermissionLevel::View, PermissionLevel::View))
+                && matches!(
+                    (p.level, level),
+                    (PermissionLevel::Admin, _)
+                        | (
+                            PermissionLevel::Edit,
+                            PermissionLevel::Edit | PermissionLevel::View
+                        )
+                        | (PermissionLevel::View, PermissionLevel::View)
+                )
         })
     }
 
@@ -299,8 +306,7 @@ impl DataEntity {
 
     /// 检查数据是否属于指定所有者或拥有共享权限
     pub fn belongs_to(&self, owner_id: &OwnerId) -> bool {
-        self.owner_id == *owner_id
-            || self.shared_with.iter().any(|p| p.user_id == *owner_id)
+        self.owner_id == *owner_id || self.shared_with.iter().any(|p| p.user_id == *owner_id)
     }
 
     /// 获取数据大小 (字节)
@@ -350,11 +356,7 @@ mod tests {
     #[test]
     fn test_data_entity_creation() {
         let owner_id = Uuid::new_v4();
-        let entity = DataEntity::new(
-            owner_id,
-            DataType::Credential,
-            b"secret password".to_vec(),
-        );
+        let entity = DataEntity::new(owner_id, DataType::Credential, b"secret password".to_vec());
 
         assert_eq!(entity.owner_id, owner_id);
         assert_eq!(entity.data_type, DataType::Credential);
@@ -377,11 +379,7 @@ mod tests {
 
     #[test]
     fn test_serialization_roundtrip() {
-        let entity = DataEntity::new(
-            Uuid::new_v4(),
-            DataType::Config,
-            b"test config".to_vec(),
-        );
+        let entity = DataEntity::new(Uuid::new_v4(), DataType::Config, b"test config".to_vec());
 
         // JSON roundtrip
         let json = entity.to_json().unwrap();
@@ -402,11 +400,7 @@ mod tests {
         let user_a = Uuid::new_v4();
         let user_b = Uuid::new_v4();
 
-        let mut entity = DataEntity::new(
-            owner_id,
-            DataType::File,
-            b"file content".to_vec(),
-        );
+        let mut entity = DataEntity::new(owner_id, DataType::File, b"file content".to_vec());
 
         // Initially no one else has permissions
         assert!(!entity.has_permission(&user_a, PermissionLevel::View));
@@ -433,11 +427,7 @@ mod tests {
         let owner_id = Uuid::new_v4();
         let user = Uuid::new_v4();
 
-        let mut entity = DataEntity::new(
-            owner_id,
-            DataType::Config,
-            b"data".to_vec(),
-        );
+        let mut entity = DataEntity::new(owner_id, DataType::Config, b"data".to_vec());
 
         entity.share_with(user, PermissionLevel::Edit, owner_id);
         assert!(entity.has_permission(&user, PermissionLevel::View));
@@ -450,11 +440,7 @@ mod tests {
         let owner_id = Uuid::new_v4();
         let user = Uuid::new_v4();
 
-        let mut entity = DataEntity::new(
-            owner_id,
-            DataType::Generic,
-            b"data".to_vec(),
-        );
+        let mut entity = DataEntity::new(owner_id, DataType::Generic, b"data".to_vec());
 
         entity.share_with(user, PermissionLevel::View, owner_id);
         assert!(entity.has_permission(&user, PermissionLevel::View));
@@ -473,11 +459,7 @@ mod tests {
         let owner_id = Uuid::new_v4();
         let user = Uuid::new_v4();
 
-        let mut entity = DataEntity::new(
-            owner_id,
-            DataType::Generic,
-            b"data".to_vec(),
-        );
+        let mut entity = DataEntity::new(owner_id, DataType::Generic, b"data".to_vec());
 
         entity.share_with(user, PermissionLevel::View, owner_id);
         assert!(entity.has_permission(&user, PermissionLevel::View));
@@ -490,7 +472,11 @@ mod tests {
         assert!(!entity.has_permission(&user, PermissionLevel::Admin));
 
         // Should only have one entry
-        let count = entity.shared_with.iter().filter(|p| p.user_id == user).count();
+        let count = entity
+            .shared_with
+            .iter()
+            .filter(|p| p.user_id == user)
+            .count();
         assert_eq!(count, 1);
     }
 
@@ -499,11 +485,7 @@ mod tests {
         let owner_id = Uuid::new_v4();
         let user = Uuid::new_v4();
 
-        let mut entity = DataEntity::new(
-            owner_id,
-            DataType::Generic,
-            b"data".to_vec(),
-        );
+        let mut entity = DataEntity::new(owner_id, DataType::Generic, b"data".to_vec());
 
         assert!(entity.belongs_to(&owner_id));
         assert!(!entity.belongs_to(&user));
@@ -517,14 +499,10 @@ mod tests {
     #[test]
     fn test_builder_with_folder_content_type_checksum() {
         let owner_id = Uuid::new_v4();
-        let entity = DataEntity::new(
-            owner_id,
-            DataType::File,
-            b"content".to_vec(),
-        )
-        .with_folder("documents/reports")
-        .with_content_type("application/pdf")
-        .with_checksum("sha256:abc123");
+        let entity = DataEntity::new(owner_id, DataType::File, b"content".to_vec())
+            .with_folder("documents/reports")
+            .with_content_type("application/pdf")
+            .with_checksum("sha256:abc123");
 
         assert_eq!(entity.folder.as_deref(), Some("documents/reports"));
         assert_eq!(entity.content_type.as_deref(), Some("application/pdf"));
@@ -534,22 +512,27 @@ mod tests {
     #[test]
     fn test_builder_with_metadata() {
         let owner_id = Uuid::new_v4();
-        let entity = DataEntity::new(
-            owner_id,
-            DataType::Config,
-            b"config".to_vec(),
-        )
-        .with_metadata("author", "alice")
-        .with_metadata("language", "en");
+        let entity = DataEntity::new(owner_id, DataType::Config, b"config".to_vec())
+            .with_metadata("author", "alice")
+            .with_metadata("language", "en");
 
-        assert_eq!(entity.metadata.get("author").map(|s| s.as_str()), Some("alice"));
-        assert_eq!(entity.metadata.get("language").map(|s| s.as_str()), Some("en"));
+        assert_eq!(
+            entity.metadata.get("author").map(|s| s.as_str()),
+            Some("alice")
+        );
+        assert_eq!(
+            entity.metadata.get("language").map(|s| s.as_str()),
+            Some("en")
+        );
 
         // with_meta (bulk)
         let mut extra = std::collections::HashMap::new();
         extra.insert("region".to_string(), "us-east-1".to_string());
         let entity = entity.with_meta(extra);
-        assert_eq!(entity.metadata.get("region").map(|s| s.as_str()), Some("us-east-1"));
+        assert_eq!(
+            entity.metadata.get("region").map(|s| s.as_str()),
+            Some("us-east-1")
+        );
     }
 
     #[test]
@@ -577,15 +560,11 @@ mod tests {
     fn test_serialization_with_new_fields() {
         let owner_id = Uuid::new_v4();
         let user = Uuid::new_v4();
-        let mut entity = DataEntity::new(
-            owner_id,
-            DataType::File,
-            b"file data".to_vec(),
-        )
-        .with_folder("photos/2024")
-        .with_content_type("image/jpeg")
-        .with_checksum("md5:deadbeef")
-        .with_metadata("camera", "iPhone 15");
+        let mut entity = DataEntity::new(owner_id, DataType::File, b"file data".to_vec())
+            .with_folder("photos/2024")
+            .with_content_type("image/jpeg")
+            .with_checksum("md5:deadbeef")
+            .with_metadata("camera", "iPhone 15");
 
         entity.share_with(user, PermissionLevel::Edit, owner_id);
 
@@ -596,7 +575,10 @@ mod tests {
         assert_eq!(restored.folder, Some("photos/2024".to_string()));
         assert_eq!(restored.content_type, Some("image/jpeg".to_string()));
         assert_eq!(restored.checksum, Some("md5:deadbeef".to_string()));
-        assert_eq!(restored.metadata.get("camera").map(|s| s.as_str()), Some("iPhone 15"));
+        assert_eq!(
+            restored.metadata.get("camera").map(|s| s.as_str()),
+            Some("iPhone 15")
+        );
         assert_eq!(restored.shared_with.len(), 1);
         assert_eq!(restored.shared_with[0].level, PermissionLevel::Edit);
 

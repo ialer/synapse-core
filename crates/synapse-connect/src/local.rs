@@ -1,7 +1,7 @@
 //! 本地文件系统 Provider
 
-use async_trait::async_trait;
 use crate::provider::*;
+use async_trait::async_trait;
 
 /// 本地文件系统 Provider
 pub struct LocalProvider {
@@ -44,16 +44,19 @@ impl Provider for LocalProvider {
     async fn connect(&self) -> ProviderResult<()> {
         // 验证目录存在
         if !self.root.exists() {
-            return Err(ProviderError::ConnectionFailed(
-                format!("目录不存在: {}", self.root.display())
-            ));
+            return Err(ProviderError::ConnectionFailed(format!(
+                "目录不存在: {}",
+                self.root.display()
+            )));
         }
-        self.connected.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.connected
+            .store(true, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
 
     async fn disconnect(&self) -> ProviderResult<()> {
-        self.connected.store(false, std::sync::atomic::Ordering::SeqCst);
+        self.connected
+            .store(false, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
 
@@ -72,13 +75,13 @@ impl Provider for LocalProvider {
             .await
             .map_err(|e| ProviderError::Internal(e.to_string()))?;
 
-        while let Some(entry) = entries.next_entry()
+        while let Some(entry) = entries
+            .next_entry()
             .await
-            .map_err(|e| ProviderError::Internal(e.to_string()))? 
+            .map_err(|e| ProviderError::Internal(e.to_string()))?
         {
             let path = entry.path();
-            let relative = path.strip_prefix(&self.root)
-                .unwrap_or(&path);
+            let relative = path.strip_prefix(&self.root).unwrap_or(&path);
             results.push(relative.to_string_lossy().to_string());
         }
 
@@ -94,7 +97,7 @@ impl Provider for LocalProvider {
 
     async fn write(&self, key: &str, data: &[u8]) -> ProviderResult<()> {
         let path = self.full_path(key);
-        
+
         // 确保父目录存在
         if let Some(parent) = path.parent() {
             tokio::fs::create_dir_all(parent)

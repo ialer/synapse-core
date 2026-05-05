@@ -22,8 +22,7 @@ impl WebdavBackend {
     /// 创建新的 WebDAV 存储后端
     pub fn new(endpoint: &str, username: &str, password: &str) -> StorageResult<Self> {
         // 验证 URL 格式
-        Url::parse(endpoint)
-            .map_err(|e| StorageError::Config(format!("Invalid URL: {}", e)))?;
+        Url::parse(endpoint).map_err(|e| StorageError::Config(format!("Invalid URL: {}", e)))?;
 
         // 配置 WebDAV 服务（链式调用）
         let builder = Webdav::default()
@@ -125,8 +124,7 @@ mod tests {
 
     #[test]
     fn test_webdav_backend_endpoint() {
-        let backend =
-            WebdavBackend::new("https://example.com/webdav", "user", "pass").unwrap();
+        let backend = WebdavBackend::new("https://example.com/webdav", "user", "pass").unwrap();
         assert_eq!(backend.endpoint(), "https://example.com/webdav");
     }
 }

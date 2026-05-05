@@ -8,15 +8,15 @@ pub enum SearchError {
     /// 索引不存在
     #[error("索引不存在: {0}")]
     IndexNotFound(String),
-    
+
     /// 查询语法错误
     #[error("查询语法错误: {0}")]
     QuerySyntaxError(String),
-    
+
     /// 存储错误
     #[error("存储错误: {0}")]
     Storage(String),
-    
+
     /// 内部错误
     #[error("内部错误: {0}")]
     Internal(String),

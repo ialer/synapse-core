@@ -1,5 +1,5 @@
 //! MCP 协议实现模块
-//! 
+//!
 //! 实现 Model Context Protocol，支持 AI Agent 标准化访问个人资料库。
 
 use serde::{Deserialize, Serialize};
@@ -15,39 +15,39 @@ pub enum McpRequest {
     /// 初始化请求
     #[serde(rename = "initialize")]
     Initialize(InitializeRequest),
-    
+
     /// 列出可用工具
     #[serde(rename = "tools/list")]
     ListTools,
-    
+
     /// 调用工具
     #[serde(rename = "tools/call")]
     CallTool(CallToolRequest),
-    
+
     /// 列出资源
     #[serde(rename = "resources/list")]
     ListResources,
-    
+
     /// 读取资源
     #[serde(rename = "resources/read")]
     ReadResource(ReadResourceRequest),
-    
+
     /// 搜索数据
     #[serde(rename = "data/search")]
     SearchData(SearchRequest),
-    
+
     /// 获取数据详情
     #[serde(rename = "data/get")]
     GetData(GetDataRequest),
-    
+
     /// 创建数据
     #[serde(rename = "data/create")]
     CreateData(CreateDataRequest),
-    
+
     /// 更新数据
     #[serde(rename = "data/update")]
     UpdateData(UpdateDataRequest),
-    
+
     /// 删除数据
     #[serde(rename = "data/delete")]
     DeleteData(DeleteDataRequest),
@@ -58,10 +58,10 @@ pub enum McpRequest {
 pub struct McpResponse {
     /// 请求 ID
     pub id: String,
-    
+
     /// 响应结果
     pub result: Option<McpResult>,
-    
+
     /// 错误信息
     pub error: Option<McpError>,
 }
@@ -73,31 +73,31 @@ pub enum McpResult {
     /// 初始化结果
     #[serde(rename = "initialize")]
     Initialize(InitializeResult),
-    
+
     /// 工具列表
     #[serde(rename = "tools/list")]
     ToolList(Vec<ToolInfo>),
-    
+
     /// 工具调用结果
     #[serde(rename = "tools/call")]
     ToolCall(ToolCallResult),
-    
+
     /// 资源列表
     #[serde(rename = "resources/list")]
     ResourceList(Vec<ResourceInfo>),
-    
+
     /// 资源内容
     #[serde(rename = "resources/read")]
     ResourceContent(ResourceContent),
-    
+
     /// 搜索结果
     #[serde(rename = "data/search")]
     SearchResult(SearchResult),
-    
+
     /// 数据详情
     #[serde(rename = "data/get")]
     DataDetail(DataDetail),
-    
+
     /// 操作结果
     #[serde(rename = "data/operation")]
     OperationResult(OperationResult),
@@ -108,7 +108,7 @@ pub enum McpResult {
 pub struct InitializeRequest {
     /// 客户端信息
     pub client_info: ClientInfo,
-    
+
     /// 支持的能力
     pub capabilities: Vec<String>,
 }
@@ -118,7 +118,7 @@ pub struct InitializeRequest {
 pub struct ClientInfo {
     /// 客户端名称
     pub name: String,
-    
+
     /// 版本号
     pub version: String,
 }
@@ -128,7 +128,7 @@ pub struct ClientInfo {
 pub struct InitializeResult {
     /// 服务器信息
     pub server_info: ServerInfo,
-    
+
     /// 支持的能力
     pub capabilities: Vec<String>,
 }
@@ -138,7 +138,7 @@ pub struct InitializeResult {
 pub struct ServerInfo {
     /// 服务器名称
     pub name: String,
-    
+
     /// 版本号
     pub version: String,
 }
@@ -148,10 +148,10 @@ pub struct ServerInfo {
 pub struct ToolInfo {
     /// 工具名称
     pub name: String,
-    
+
     /// 工具描述
     pub description: String,
-    
+
     /// 输入参数
     pub input_schema: serde_json::Value,
 }
@@ -161,7 +161,7 @@ pub struct ToolInfo {
 pub struct CallToolRequest {
     /// 工具名称
     pub name: String,
-    
+
     /// 输入参数
     pub arguments: HashMap<String, serde_json::Value>,
 }
@@ -171,7 +171,7 @@ pub struct CallToolRequest {
 pub struct ToolCallResult {
     /// 输出内容
     pub content: Vec<Content>,
-    
+
     /// 是否为错误
     pub is_error: bool,
 }
@@ -181,7 +181,7 @@ pub struct ToolCallResult {
 pub struct Content {
     /// 内容类型
     pub content_type: String,
-    
+
     /// 内容文本
     pub text: String,
 }
@@ -191,13 +191,13 @@ pub struct Content {
 pub struct ResourceInfo {
     /// 资源 URI
     pub uri: String,
-    
+
     /// 资源名称
     pub name: String,
-    
+
     /// 资源描述
     pub description: String,
-    
+
     /// MIME 类型
     pub mime_type: String,
 }
@@ -214,10 +214,10 @@ pub struct ReadResourceRequest {
 pub struct ResourceContent {
     /// URI
     pub uri: String,
-    
+
     /// MIME 类型
     pub mime_type: String,
-    
+
     /// 内容
     pub text: String,
 }
@@ -227,13 +227,13 @@ pub struct ResourceContent {
 pub struct SearchRequest {
     /// 搜索关键词
     pub query: String,
-    
+
     /// 数据类型过滤
     pub data_type: Option<String>,
-    
+
     /// 标签过滤
     pub tags: Option<Vec<String>>,
-    
+
     /// 最大结果数
     pub limit: Option<usize>,
 }
@@ -243,7 +243,7 @@ pub struct SearchRequest {
 pub struct SearchResult {
     /// 结果列表
     pub results: Vec<SearchResultItem>,
-    
+
     /// 总数
     pub total: usize,
 }
@@ -253,16 +253,16 @@ pub struct SearchResult {
 pub struct SearchResultItem {
     /// 数据 ID
     pub id: String,
-    
+
     /// 数据类型
     pub data_type: String,
-    
+
     /// 标签
     pub tags: Vec<String>,
-    
+
     /// 相关度分数
     pub score: f64,
-    
+
     /// 摘要
     pub summary: String,
 }
@@ -279,22 +279,22 @@ pub struct GetDataRequest {
 pub struct DataDetail {
     /// 数据 ID
     pub id: String,
-    
+
     /// 所有者 ID
     pub owner_id: String,
-    
+
     /// 数据类型
     pub data_type: String,
-    
+
     /// 标签
     pub tags: Vec<String>,
-    
+
     /// 创建时间
     pub created_at: String,
-    
+
     /// 更新时间
     pub updated_at: String,
-    
+
     /// 版本号
     pub version: u64,
 }
@@ -304,10 +304,10 @@ pub struct DataDetail {
 pub struct CreateDataRequest {
     /// 数据类型
     pub data_type: String,
-    
+
     /// 数据内容（加密前）
     pub content: String,
-    
+
     /// 标签
     pub tags: Option<Vec<String>>,
 }
@@ -317,10 +317,10 @@ pub struct CreateDataRequest {
 pub struct UpdateDataRequest {
     /// 数据 ID
     pub id: String,
-    
+
     /// 新内容（加密前）
     pub content: Option<String>,
-    
+
     /// 新标签
     pub tags: Option<Vec<String>>,
 }
@@ -330,7 +330,7 @@ pub struct UpdateDataRequest {
 pub struct DeleteDataRequest {
     /// 数据 ID
     pub id: String,
-    
+
     /// 是否硬删除
     pub hard_delete: Option<bool>,
 }
@@ -340,10 +340,10 @@ pub struct DeleteDataRequest {
 pub struct OperationResult {
     /// 是否成功
     pub success: bool,
-    
+
     /// 消息
     pub message: String,
-    
+
     /// 数据 ID
     pub id: Option<String>,
 }
@@ -353,7 +353,7 @@ pub struct OperationResult {
 pub struct McpError {
     /// 错误码
     pub code: i32,
-    
+
     /// 错误消息
     pub message: String,
 }
@@ -362,13 +362,13 @@ pub struct McpError {
 pub struct McpServer {
     /// 服务器名称
     name: String,
-    
+
     /// 版本号
     version: String,
-    
+
     /// 已注册的工具
     tools: Vec<ToolInfo>,
-    
+
     /// 数据提供者
     provider: Arc<dyn DataProvider>,
 
@@ -389,7 +389,7 @@ impl McpServer {
             tool_registry,
         }
     }
-    
+
     /// 创建新的 MCP 服务器（带 DataProvider）
     pub fn with_provider(name: &str, version: &str, provider: Arc<dyn DataProvider>) -> Self {
         let tool_registry = crate::tools::create_registry_with_provider(provider.clone());
@@ -401,7 +401,7 @@ impl McpServer {
             tool_registry,
         }
     }
-    
+
     /// 处理请求
     pub fn handle_request(&self, request: McpRequest) -> McpResponse {
         match request {
@@ -417,7 +417,7 @@ impl McpServer {
             McpRequest::DeleteData(req) => self.handle_delete_data(req),
         }
     }
-    
+
     /// 异步处理请求（使用 DataProvider 进行真实数据操作）
     pub async fn handle_request_async(&self, request: McpRequest) -> McpResponse {
         match request {
@@ -431,7 +431,7 @@ impl McpServer {
             _ => self.handle_request(request),
         }
     }
-    
+
     /// 处理初始化请求
     fn handle_initialize(&self, _req: InitializeRequest) -> McpResponse {
         McpResponse {
@@ -450,7 +450,7 @@ impl McpServer {
             error: None,
         }
     }
-    
+
     /// 处理列出工具请求
     fn handle_list_tools(&self) -> McpResponse {
         McpResponse {
@@ -459,7 +459,7 @@ impl McpServer {
             error: None,
         }
     }
-    
+
     /// 处理调用工具请求（同步版本，使用 ToolRegistry）
     fn handle_call_tool(&self, req: CallToolRequest) -> McpResponse {
         let name = req.name.clone();
@@ -495,7 +495,11 @@ impl McpServer {
 
     /// 异步处理调用工具请求（通过 ToolRegistry 执行）
     async fn handle_call_tool_async(&self, req: CallToolRequest) -> McpResponse {
-        match self.tool_registry.execute_tool(&req.name, req.arguments).await {
+        match self
+            .tool_registry
+            .execute_tool(&req.name, req.arguments)
+            .await
+        {
             Ok(tool_result) => McpResponse {
                 id: "1".to_string(),
                 result: Some(McpResult::ToolCall(ToolCallResult {
@@ -520,42 +524,38 @@ impl McpServer {
             },
         }
     }
-    
+
     /// 处理列出资源请求
     fn handle_list_resources(&self) -> McpResponse {
         McpResponse {
             id: "1".to_string(),
-            result: Some(McpResult::ResourceList(vec![
-                ResourceInfo {
-                    uri: "synapse://data".to_string(),
-                    name: "Personal Data".to_string(),
-                    description: "Access personal data items".to_string(),
-                    mime_type: "application/json".to_string(),
-                },
-            ])),
+            result: Some(McpResult::ResourceList(vec![ResourceInfo {
+                uri: "synapse://data".to_string(),
+                name: "Personal Data".to_string(),
+                description: "Access personal data items".to_string(),
+                mime_type: "application/json".to_string(),
+            }])),
             error: None,
         }
     }
-    
+
     /// 异步处理列出资源请求（返回实际数据统计）
     async fn handle_list_resources_async(&self) -> McpResponse {
         let items = self.provider.list_all_data().await;
         let count = items.len();
-        
+
         McpResponse {
             id: "1".to_string(),
-            result: Some(McpResult::ResourceList(vec![
-                ResourceInfo {
-                    uri: "synapse://data".to_string(),
-                    name: "Personal Data".to_string(),
-                    description: format!("{} data items available", count),
-                    mime_type: "application/json".to_string(),
-                },
-            ])),
+            result: Some(McpResult::ResourceList(vec![ResourceInfo {
+                uri: "synapse://data".to_string(),
+                name: "Personal Data".to_string(),
+                description: format!("{} data items available", count),
+                mime_type: "application/json".to_string(),
+            }])),
             error: None,
         }
     }
-    
+
     /// 处理读取资源请求
     fn handle_read_resource(&self, req: ReadResourceRequest) -> McpResponse {
         McpResponse {
@@ -568,7 +568,7 @@ impl McpServer {
             error: None,
         }
     }
-    
+
     /// 处理搜索数据请求（同步版本，返回空结果）
     fn handle_search_data(&self, _req: SearchRequest) -> McpResponse {
         McpResponse {
@@ -580,41 +580,45 @@ impl McpServer {
             error: None,
         }
     }
-    
+
     /// 异步处理搜索数据请求（使用 DataProvider）
     async fn handle_search_data_async(&self, req: SearchRequest) -> McpResponse {
         let limit = req.limit.unwrap_or(10);
         let entries = self.provider.search_data(&req.query, limit).await;
-        
-        let results: Vec<SearchResultItem> = entries.into_iter().map(|entry| {
-            let data_type_str = entry.metadata.get("type")
-                .cloned()
-                .unwrap_or_else(|| "generic".to_string());
-            let tags_vec: Vec<String> = entry.metadata.get("tags")
-                .map(|t| t.split(',').map(String::from).collect())
-                .unwrap_or_default();
-            
-            SearchResultItem {
-                id: entry.id,
-                data_type: data_type_str,
-                tags: tags_vec,
-                score: 1.0,
-                summary: entry.content,
-            }
-        }).collect();
-        
+
+        let results: Vec<SearchResultItem> = entries
+            .into_iter()
+            .map(|entry| {
+                let data_type_str = entry
+                    .metadata
+                    .get("type")
+                    .cloned()
+                    .unwrap_or_else(|| "generic".to_string());
+                let tags_vec: Vec<String> = entry
+                    .metadata
+                    .get("tags")
+                    .map(|t| t.split(',').map(String::from).collect())
+                    .unwrap_or_default();
+
+                SearchResultItem {
+                    id: entry.id,
+                    data_type: data_type_str,
+                    tags: tags_vec,
+                    score: 1.0,
+                    summary: entry.content,
+                }
+            })
+            .collect();
+
         let total = results.len();
-        
+
         McpResponse {
             id: "1".to_string(),
-            result: Some(McpResult::SearchResult(SearchResult {
-                results,
-                total,
-            })),
+            result: Some(McpResult::SearchResult(SearchResult { results, total })),
             error: None,
         }
     }
-    
+
     /// 处理获取数据请求（同步版本，返回空数据）
     fn handle_get_data(&self, req: GetDataRequest) -> McpResponse {
         McpResponse {
@@ -631,25 +635,23 @@ impl McpServer {
             error: None,
         }
     }
-    
+
     /// 异步处理获取数据请求（使用 DataProvider）
     async fn handle_get_data_async(&self, req: GetDataRequest) -> McpResponse {
         match self.provider.get_data("", &req.id).await {
-            Ok((id, data_type_str, tags, _content)) => {
-                McpResponse {
-                    id: "1".to_string(),
-                    result: Some(McpResult::DataDetail(DataDetail {
-                        id,
-                        owner_id: "agent".to_string(),
-                        data_type: data_type_str,
-                        tags,
-                        created_at: chrono::Utc::now().to_rfc3339(),
-                        updated_at: chrono::Utc::now().to_rfc3339(),
-                        version: 1,
-                    })),
-                    error: None,
-                }
-            }
+            Ok((id, data_type_str, tags, _content)) => McpResponse {
+                id: "1".to_string(),
+                result: Some(McpResult::DataDetail(DataDetail {
+                    id,
+                    owner_id: "agent".to_string(),
+                    data_type: data_type_str,
+                    tags,
+                    created_at: chrono::Utc::now().to_rfc3339(),
+                    updated_at: chrono::Utc::now().to_rfc3339(),
+                    version: 1,
+                })),
+                error: None,
+            },
             Err(e) => McpResponse {
                 id: "1".to_string(),
                 result: None,
@@ -660,7 +662,7 @@ impl McpServer {
             },
         }
     }
-    
+
     /// 处理创建数据请求（同步版本）
     fn handle_create_data(&self, _req: CreateDataRequest) -> McpResponse {
         McpResponse {
@@ -673,13 +675,17 @@ impl McpServer {
             error: None,
         }
     }
-    
+
     /// 异步处理创建数据请求（使用 DataProvider）
     async fn handle_create_data_async(&self, req: CreateDataRequest) -> McpResponse {
         let tags = req.tags.unwrap_or_default();
         let content_bytes = req.content.into_bytes();
-        
-        match self.provider.store_data("", &req.data_type, content_bytes, tags).await {
+
+        match self
+            .provider
+            .store_data("", &req.data_type, content_bytes, tags)
+            .await
+        {
             Ok(id) => McpResponse {
                 id: "1".to_string(),
                 result: Some(McpResult::OperationResult(OperationResult {
@@ -699,7 +705,7 @@ impl McpServer {
             },
         }
     }
-    
+
     /// 处理更新数据请求
     fn handle_update_data(&self, _req: UpdateDataRequest) -> McpResponse {
         McpResponse {
@@ -712,7 +718,7 @@ impl McpServer {
             error: None,
         }
     }
-    
+
     /// 处理删除数据请求
     fn handle_delete_data(&self, _req: DeleteDataRequest) -> McpResponse {
         McpResponse {
@@ -732,12 +738,14 @@ impl McpServer {
         match self.provider.get_data("", &req.id).await {
             Ok((_id, data_type_str, _tags, _content)) => {
                 // 构造新内容
-                let new_content = req.content
-                    .map(|c| c.into_bytes())
-                    .unwrap_or_default();
+                let new_content = req.content.map(|c| c.into_bytes()).unwrap_or_default();
                 let new_tags = req.tags.unwrap_or_default();
 
-                match self.provider.store_data("", &data_type_str, new_content, new_tags).await {
+                match self
+                    .provider
+                    .store_data("", &data_type_str, new_content, new_tags)
+                    .await
+                {
                     Ok(new_id) => McpResponse {
                         id: "1".to_string(),
                         result: Some(McpResult::OperationResult(OperationResult {
@@ -775,7 +783,10 @@ impl McpServer {
             id: "1".to_string(),
             result: Some(McpResult::OperationResult(OperationResult {
                 success: false,
-                message: format!("Delete not supported by current DataProvider for id: {}", req.id),
+                message: format!(
+                    "Delete not supported by current DataProvider for id: {}",
+                    req.id
+                ),
                 id: None,
             })),
             error: None,
@@ -811,10 +822,10 @@ mod tests {
             },
             capabilities: vec!["tools".to_string()],
         });
-        
+
         let server = McpServer::new("synapse-core", "0.1.0");
         let response = server.handle_request(request);
-        
+
         assert!(response.result.is_some());
         assert!(response.error.is_none());
     }
@@ -823,7 +834,7 @@ mod tests {
     fn test_list_tools_request() {
         let server = McpServer::new("synapse-core", "0.1.0");
         let response = server.handle_request(McpRequest::ListTools);
-        
+
         assert!(response.result.is_some());
     }
 
@@ -831,18 +842,18 @@ mod tests {
     async fn test_async_search_with_null_provider() {
         let provider = Arc::new(NullDataProvider);
         let server = McpServer::with_provider("synapse-core", "0.1.0", provider);
-        
+
         let request = McpRequest::SearchData(SearchRequest {
             query: "github".to_string(),
             data_type: None,
             tags: None,
             limit: Some(10),
         });
-        
+
         let response = server.handle_request_async(request).await;
         assert!(response.result.is_some());
         assert!(response.error.is_none());
-        
+
         if let Some(McpResult::SearchResult(result)) = response.result {
             assert_eq!(result.total, 0);
             assert!(result.results.is_empty());
@@ -853,11 +864,11 @@ mod tests {
     async fn test_async_get_data_with_null_provider() {
         let provider = Arc::new(NullDataProvider);
         let server = McpServer::with_provider("synapse-core", "0.1.0", provider);
-        
+
         let request = McpRequest::GetData(GetDataRequest {
             id: "nonexistent".to_string(),
         });
-        
+
         let response = server.handle_request_async(request).await;
         // NullDataProvider returns error for get_data
         assert!(response.error.is_some());
@@ -867,13 +878,13 @@ mod tests {
     async fn test_async_create_data_with_null_provider() {
         let provider = Arc::new(NullDataProvider);
         let server = McpServer::with_provider("synapse-core", "0.1.0", provider);
-        
+
         let request = McpRequest::CreateData(CreateDataRequest {
             data_type: "credential".to_string(),
             content: "secret".to_string(),
             tags: Some(vec!["test".to_string()]),
         });
-        
+
         let response = server.handle_request_async(request).await;
         // NullDataProvider returns error for store_data
         assert!(response.error.is_some());
@@ -884,10 +895,12 @@ mod tests {
         let server = McpServer::new("synapse-core", "0.1.0");
         let mut args = std::collections::HashMap::new();
         args.insert("query".to_string(), serde_json::json!("github"));
-        let response = server.handle_request_async(McpRequest::CallTool(CallToolRequest {
-            name: "search_data".to_string(),
-            arguments: args,
-        })).await;
+        let response = server
+            .handle_request_async(McpRequest::CallTool(CallToolRequest {
+                name: "search_data".to_string(),
+                arguments: args,
+            }))
+            .await;
         assert!(response.result.is_some());
         assert!(response.error.is_none());
         if let Some(McpResult::ToolCall(tc)) = response.result {
@@ -900,10 +913,12 @@ mod tests {
     #[tokio::test]
     async fn test_call_tool_not_found() {
         let server = McpServer::new("synapse-core", "0.1.0");
-        let response = server.handle_request_async(McpRequest::CallTool(CallToolRequest {
-            name: "nonexistent".to_string(),
-            arguments: std::collections::HashMap::new(),
-        })).await;
+        let response = server
+            .handle_request_async(McpRequest::CallTool(CallToolRequest {
+                name: "nonexistent".to_string(),
+                arguments: std::collections::HashMap::new(),
+            }))
+            .await;
         assert!(response.result.is_some());
         if let Some(McpResult::ToolCall(tc)) = response.result {
             assert!(tc.is_error);
@@ -919,10 +934,12 @@ mod tests {
         let mut args = std::collections::HashMap::new();
         args.insert("query".to_string(), serde_json::json!("test"));
 
-        let response = server.handle_request_async(McpRequest::CallTool(CallToolRequest {
-            name: "search_data".to_string(),
-            arguments: args,
-        })).await;
+        let response = server
+            .handle_request_async(McpRequest::CallTool(CallToolRequest {
+                name: "search_data".to_string(),
+                arguments: args,
+            }))
+            .await;
         assert!(response.result.is_some());
         assert!(response.error.is_none());
     }
@@ -931,11 +948,13 @@ mod tests {
     async fn test_async_update_data_with_null_provider() {
         let provider = Arc::new(NullDataProvider);
         let server = McpServer::with_provider("synapse-core", "0.1.0", provider);
-        let response = server.handle_request_async(McpRequest::UpdateData(UpdateDataRequest {
-            id: "nonexistent".to_string(),
-            content: Some("new content".to_string()),
-            tags: None,
-        })).await;
+        let response = server
+            .handle_request_async(McpRequest::UpdateData(UpdateDataRequest {
+                id: "nonexistent".to_string(),
+                content: Some("new content".to_string()),
+                tags: None,
+            }))
+            .await;
         // NullDataProvider.get_data fails -> error
         assert!(response.error.is_some());
     }
@@ -944,10 +963,12 @@ mod tests {
     async fn test_async_delete_data_with_null_provider() {
         let provider = Arc::new(NullDataProvider);
         let server = McpServer::with_provider("synapse-core", "0.1.0", provider);
-        let response = server.handle_request_async(McpRequest::DeleteData(DeleteDataRequest {
-            id: "test-id".to_string(),
-            hard_delete: Some(false),
-        })).await;
+        let response = server
+            .handle_request_async(McpRequest::DeleteData(DeleteDataRequest {
+                id: "test-id".to_string(),
+                hard_delete: Some(false),
+            }))
+            .await;
         assert!(response.result.is_some());
         if let Some(McpResult::OperationResult(op)) = response.result {
             assert!(!op.success);
@@ -961,10 +982,15 @@ mod tests {
     async fn test_handle_request_all_variants_sync() {
         let server = McpServer::new("synapse-core", "0.1.0");
         // Initialize
-        let r = server.handle_request_async(McpRequest::Initialize(InitializeRequest {
-            client_info: ClientInfo { name: "t".into(), version: "1".into() },
-            capabilities: vec![],
-        })).await;
+        let r = server
+            .handle_request_async(McpRequest::Initialize(InitializeRequest {
+                client_info: ClientInfo {
+                    name: "t".into(),
+                    version: "1".into(),
+                },
+                capabilities: vec![],
+            }))
+            .await;
         assert!(r.error.is_none());
         // ListTools
         let r = server.handle_request_async(McpRequest::ListTools).await;
@@ -973,35 +999,62 @@ mod tests {
         let r = server.handle_request_async(McpRequest::ListResources).await;
         assert!(r.error.is_none());
         // ReadResource
-        let r = server.handle_request_async(McpRequest::ReadResource(ReadResourceRequest { uri: "test://x".into() })).await;
+        let r = server
+            .handle_request_async(McpRequest::ReadResource(ReadResourceRequest {
+                uri: "test://x".into(),
+            }))
+            .await;
         assert!(r.error.is_none());
         // CallTool (search_data with query)
         let mut args = std::collections::HashMap::new();
         args.insert("query".to_string(), serde_json::json!("q"));
-        let r = server.handle_request_async(McpRequest::CallTool(CallToolRequest { name: "search_data".into(), arguments: args })).await;
+        let r = server
+            .handle_request_async(McpRequest::CallTool(CallToolRequest {
+                name: "search_data".into(),
+                arguments: args,
+            }))
+            .await;
         assert!(r.error.is_none());
         // SearchData
-        let r = server.handle_request_async(McpRequest::SearchData(SearchRequest {
-            query: "q".into(), data_type: None, tags: None, limit: None,
-        })).await;
+        let r = server
+            .handle_request_async(McpRequest::SearchData(SearchRequest {
+                query: "q".into(),
+                data_type: None,
+                tags: None,
+                limit: None,
+            }))
+            .await;
         assert!(r.error.is_none());
         // GetData (NullDataProvider returns error for nonexistent data)
-        let r = server.handle_request_async(McpRequest::GetData(GetDataRequest { id: "x".into() })).await;
+        let r = server
+            .handle_request_async(McpRequest::GetData(GetDataRequest { id: "x".into() }))
+            .await;
         assert!(r.error.is_some());
         // CreateData (NullDataProvider returns error for store_data)
-        let r = server.handle_request_async(McpRequest::CreateData(CreateDataRequest {
-            data_type: "generic".into(), content: "c".into(), tags: None,
-        })).await;
+        let r = server
+            .handle_request_async(McpRequest::CreateData(CreateDataRequest {
+                data_type: "generic".into(),
+                content: "c".into(),
+                tags: None,
+            }))
+            .await;
         assert!(r.error.is_some());
         // UpdateData (NullDataProvider returns error for get_data)
-        let r = server.handle_request_async(McpRequest::UpdateData(UpdateDataRequest {
-            id: "x".into(), content: None, tags: None,
-        })).await;
+        let r = server
+            .handle_request_async(McpRequest::UpdateData(UpdateDataRequest {
+                id: "x".into(),
+                content: None,
+                tags: None,
+            }))
+            .await;
         assert!(r.error.is_some());
         // DeleteData (returns success=false message since provider has no delete)
-        let r = server.handle_request_async(McpRequest::DeleteData(DeleteDataRequest {
-            id: "x".into(), hard_delete: None,
-        })).await;
+        let r = server
+            .handle_request_async(McpRequest::DeleteData(DeleteDataRequest {
+                id: "x".into(),
+                hard_delete: None,
+            }))
+            .await;
         assert!(r.result.is_some());
     }
 }

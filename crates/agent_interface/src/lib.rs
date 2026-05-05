@@ -1,18 +1,18 @@
 //! # Agent Interface - Agent 接口模块
-//! 
+//!
 //! 提供 MCP 协议和 CLI 接口，支持 AI Agent 访问个人资料库。
 
-pub mod mcp;
-pub mod cli;
-pub mod tools;
 pub mod agent_service;
+pub mod cli;
+pub mod mcp;
+pub mod tools;
 
 use async_trait::async_trait;
 
-pub use mcp::McpServer;
+pub use agent_service::{AgentAccess, AgentError, AgentService, AgentSession, MemoryAgentService};
 pub use cli::CliInterface;
-pub use tools::{ToolRegistry, Tool};
-pub use agent_service::{AgentService, MemoryAgentService, AgentSession, AgentAccess, AgentError};
+pub use mcp::McpServer;
+pub use tools::{Tool, ToolRegistry};
 
 /// 搜索结果项（DataProvider 返回类型）
 #[derive(Debug, Clone)]

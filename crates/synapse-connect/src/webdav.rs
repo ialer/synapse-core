@@ -3,8 +3,8 @@
 //! 使用 OpenDAL 的 WebDAV 后端实现远程文件存储访问。
 //! 当前为基础实现，后续可扩展完整的 WebDAV 支持。
 
-use async_trait::async_trait;
 use crate::provider::*;
+use async_trait::async_trait;
 
 /// WebDAV Provider 配置
 pub struct WebDavConfig {
@@ -49,12 +49,14 @@ impl Provider for WebDavProvider {
 
     async fn connect(&self) -> ProviderResult<()> {
         // TODO: 使用 reqwest 或 opendal 实际连接验证
-        self.connected.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.connected
+            .store(true, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
 
     async fn disconnect(&self) -> ProviderResult<()> {
-        self.connected.store(false, std::sync::atomic::Ordering::SeqCst);
+        self.connected
+            .store(false, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
 
@@ -75,11 +77,15 @@ impl Provider for WebDavProvider {
     }
 
     async fn delete(&self, _key: &str) -> ProviderResult<()> {
-        Err(ProviderError::Internal("WebDAV delete 尚未实现".to_string()))
+        Err(ProviderError::Internal(
+            "WebDAV delete 尚未实现".to_string(),
+        ))
     }
 
     async fn exists(&self, _key: &str) -> ProviderResult<bool> {
-        Err(ProviderError::Internal("WebDAV exists 尚未实现".to_string()))
+        Err(ProviderError::Internal(
+            "WebDAV exists 尚未实现".to_string(),
+        ))
     }
 
     async fn size(&self, _key: &str) -> ProviderResult<u64> {

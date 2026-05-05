@@ -103,8 +103,7 @@ impl StorageBackend for OpendalBackend {
                 } else {
                     Err(StorageError::Network(format!(
                         "{} exists check failed: {}",
-                        self.name,
-                        e
+                        self.name, e
                     )))
                 }
             }

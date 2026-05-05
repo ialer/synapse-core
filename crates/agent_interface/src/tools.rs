@@ -1,10 +1,10 @@
 //! 工具注册模块
-//! 
+//!
 //! 定义和管理 Agent 可用的工具。
 
+use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
-use async_trait::async_trait;
 
 use crate::DataProvider;
 
@@ -13,13 +13,13 @@ use crate::DataProvider;
 pub struct Tool {
     /// 工具名称
     pub name: String,
-    
+
     /// 工具描述
     pub description: String,
-    
+
     /// 输入参数 schema
     pub input_schema: serde_json::Value,
-    
+
     /// 所需权限
     pub permissions: Vec<String>,
 }
@@ -29,10 +29,10 @@ pub struct Tool {
 pub struct ToolResult {
     /// 是否成功
     pub success: bool,
-    
+
     /// 输出内容
     pub output: String,
-    
+
     /// 元数据
     pub metadata: HashMap<String, serde_json::Value>,
 }
@@ -41,14 +41,15 @@ pub struct ToolResult {
 #[async_trait]
 pub trait ToolExecutor: Send + Sync {
     /// 执行工具
-    async fn execute(&self, args: HashMap<String, serde_json::Value>) -> Result<ToolResult, String>;
+    async fn execute(&self, args: HashMap<String, serde_json::Value>)
+        -> Result<ToolResult, String>;
 }
 
 /// 工具注册表
 pub struct ToolRegistry {
     /// 已注册的工具
     tools: HashMap<String, Tool>,
-    
+
     /// 工具执行器
     executors: HashMap<String, Box<dyn ToolExecutor>>,
 }
@@ -61,40 +62,50 @@ impl ToolRegistry {
             executors: HashMap::new(),
         }
     }
-    
+
     /// 注册工具
     pub fn register(&mut self, tool: Tool, executor: Box<dyn ToolExecutor>) {
         let name = tool.name.clone();
         self.tools.insert(name.clone(), tool);
         self.executors.insert(name, executor);
     }
-    
+
     /// 获取工具信息
     pub fn get_tool(&self, name: &str) -> Option<&Tool> {
         self.tools.get(name)
     }
-    
+
     /// 列出所有工具
     pub fn list_tools(&self) -> Vec<&Tool> {
         self.tools.values().collect()
     }
-    
+
     /// 执行工具
-    pub async fn execute_tool(&self, name: &str, args: HashMap<String, serde_json::Value>) -> Result<ToolResult, String> {
-        let _tool = self.tools.get(name).ok_or_else(|| format!("Tool not found: {}", name))?;
-        let executor = self.executors.get(name).ok_or_else(|| format!("Executor not found: {}", name))?;
-        
+    pub async fn execute_tool(
+        &self,
+        name: &str,
+        args: HashMap<String, serde_json::Value>,
+    ) -> Result<ToolResult, String> {
+        let _tool = self
+            .tools
+            .get(name)
+            .ok_or_else(|| format!("Tool not found: {}", name))?;
+        let executor = self
+            .executors
+            .get(name)
+            .ok_or_else(|| format!("Executor not found: {}", name))?;
+
         // 检查权限（简化版本）
         // TODO: 实现完整的权限检查
-        
+
         executor.execute(args).await
     }
-    
+
     /// 检查工具是否存在
     pub fn has_tool(&self, name: &str) -> bool {
         self.tools.contains_key(name)
     }
-    
+
     /// 获取工具数量
     pub fn tool_count(&self) -> usize {
         self.tools.len()
@@ -120,37 +131,45 @@ impl SearchDataTool {
 
 #[async_trait]
 impl ToolExecutor for SearchDataTool {
-    async fn execute(&self, args: HashMap<String, serde_json::Value>) -> Result<ToolResult, String> {
-        let query = args.get("query")
+    async fn execute(
+        &self,
+        args: HashMap<String, serde_json::Value>,
+    ) -> Result<ToolResult, String> {
+        let query = args
+            .get("query")
             .and_then(|v| v.as_str())
             .ok_or("Missing 'query' argument")?;
-        
-        let _data_type = args.get("data_type")
-            .and_then(|v| v.as_str());
-        
-        let limit = args.get("limit")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(10) as usize;
-        
+
+        let _data_type = args.get("data_type").and_then(|v| v.as_str());
+
+        let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
+
         // 调用真实的 DataProvider 进行搜索
         let entries = self.provider.search_data(query, limit).await;
-        
-        let results: Vec<serde_json::Value> = entries.into_iter().map(|entry| {
-            let data_type_str = entry.metadata.get("type")
-                .cloned()
-                .unwrap_or_else(|| "generic".to_string());
-            let score_str = entry.metadata.get("score")
-                .and_then(|s| s.parse::<f64>().ok())
-                .unwrap_or(1.0);
-            
-            serde_json::json!({
-                "id": entry.id,
-                "type": data_type_str,
-                "content": entry.content,
-                "score": score_str
+
+        let results: Vec<serde_json::Value> = entries
+            .into_iter()
+            .map(|entry| {
+                let data_type_str = entry
+                    .metadata
+                    .get("type")
+                    .cloned()
+                    .unwrap_or_else(|| "generic".to_string());
+                let score_str = entry
+                    .metadata
+                    .get("score")
+                    .and_then(|s| s.parse::<f64>().ok())
+                    .unwrap_or(1.0);
+
+                serde_json::json!({
+                    "id": entry.id,
+                    "type": data_type_str,
+                    "content": entry.content,
+                    "score": score_str
+                })
             })
-        }).collect();
-        
+            .collect();
+
         Ok(ToolResult {
             success: true,
             output: serde_json::to_string_pretty(&serde_json::json!({
@@ -158,7 +177,8 @@ impl ToolExecutor for SearchDataTool {
                 "limit": limit,
                 "results": results,
                 "total": results.len()
-            })).unwrap(),
+            }))
+            .unwrap(),
             metadata: HashMap::new(),
         })
     }
@@ -177,37 +197,37 @@ impl GetDataTool {
 
 #[async_trait]
 impl ToolExecutor for GetDataTool {
-    async fn execute(&self, args: HashMap<String, serde_json::Value>) -> Result<ToolResult, String> {
-        let id = args.get("id")
+    async fn execute(
+        &self,
+        args: HashMap<String, serde_json::Value>,
+    ) -> Result<ToolResult, String> {
+        let id = args
+            .get("id")
             .and_then(|v| v.as_str())
             .ok_or("Missing 'id' argument")?;
-        
-        let token = args.get("token")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        
+
+        let token = args.get("token").and_then(|v| v.as_str()).unwrap_or("");
+
         match self.provider.get_data(token, id).await {
-            Ok((id, data_type_str, tags, content)) => {
-                Ok(ToolResult {
-                    success: true,
-                    output: serde_json::to_string_pretty(&serde_json::json!({
-                        "id": id,
-                        "type": data_type_str,
-                        "content": String::from_utf8_lossy(&content).to_string(),
-                        "tags": tags,
-                    })).unwrap(),
-                    metadata: HashMap::new(),
-                })
-            }
-            Err(e) => {
-                Ok(ToolResult {
-                    success: false,
-                    output: serde_json::to_string_pretty(&serde_json::json!({
-                        "error": e
-                    })).unwrap(),
-                    metadata: HashMap::new(),
-                })
-            }
+            Ok((id, data_type_str, tags, content)) => Ok(ToolResult {
+                success: true,
+                output: serde_json::to_string_pretty(&serde_json::json!({
+                    "id": id,
+                    "type": data_type_str,
+                    "content": String::from_utf8_lossy(&content).to_string(),
+                    "tags": tags,
+                }))
+                .unwrap(),
+                metadata: HashMap::new(),
+            }),
+            Err(e) => Ok(ToolResult {
+                success: false,
+                output: serde_json::to_string_pretty(&serde_json::json!({
+                    "error": e
+                }))
+                .unwrap(),
+                metadata: HashMap::new(),
+            }),
         }
     }
 }
@@ -225,48 +245,58 @@ impl CreateDataTool {
 
 #[async_trait]
 impl ToolExecutor for CreateDataTool {
-    async fn execute(&self, args: HashMap<String, serde_json::Value>) -> Result<ToolResult, String> {
-        let data_type = args.get("data_type")
+    async fn execute(
+        &self,
+        args: HashMap<String, serde_json::Value>,
+    ) -> Result<ToolResult, String> {
+        let data_type = args
+            .get("data_type")
             .and_then(|v| v.as_str())
             .ok_or("Missing 'data_type' argument")?;
-        
-        let content = args.get("content")
+
+        let content = args
+            .get("content")
             .and_then(|v| v.as_str())
             .ok_or("Missing 'content' argument")?;
-        
-        let token = args.get("token")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        
-        let tags: Vec<String> = args.get("tags")
+
+        let token = args.get("token").and_then(|v| v.as_str()).unwrap_or("");
+
+        let tags: Vec<String> = args
+            .get("tags")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
-        
+
         let content_bytes = content.as_bytes().to_vec();
-        
-        match self.provider.store_data(token, data_type, content_bytes, tags.clone()).await {
-            Ok(id) => {
-                Ok(ToolResult {
-                    success: true,
-                    output: serde_json::to_string_pretty(&serde_json::json!({
-                        "success": true,
-                        "id": id,
-                        "message": format!("Created {} data with {} tags", data_type, tags.len())
-                    })).unwrap(),
-                    metadata: HashMap::new(),
-                })
-            }
-            Err(e) => {
-                Ok(ToolResult {
-                    success: false,
-                    output: serde_json::to_string_pretty(&serde_json::json!({
-                        "success": false,
-                        "error": e
-                    })).unwrap(),
-                    metadata: HashMap::new(),
-                })
-            }
+
+        match self
+            .provider
+            .store_data(token, data_type, content_bytes, tags.clone())
+            .await
+        {
+            Ok(id) => Ok(ToolResult {
+                success: true,
+                output: serde_json::to_string_pretty(&serde_json::json!({
+                    "success": true,
+                    "id": id,
+                    "message": format!("Created {} data with {} tags", data_type, tags.len())
+                }))
+                .unwrap(),
+                metadata: HashMap::new(),
+            }),
+            Err(e) => Ok(ToolResult {
+                success: false,
+                output: serde_json::to_string_pretty(&serde_json::json!({
+                    "success": false,
+                    "error": e
+                }))
+                .unwrap(),
+                metadata: HashMap::new(),
+            }),
         }
     }
 }
@@ -284,29 +314,42 @@ impl UpdateDataTool {
 
 #[async_trait]
 impl ToolExecutor for UpdateDataTool {
-    async fn execute(&self, args: HashMap<String, serde_json::Value>) -> Result<ToolResult, String> {
-        let id = args.get("id")
+    async fn execute(
+        &self,
+        args: HashMap<String, serde_json::Value>,
+    ) -> Result<ToolResult, String> {
+        let id = args
+            .get("id")
             .and_then(|v| v.as_str())
             .ok_or("Missing 'id' argument")?;
-        let content = args.get("content")
+        let content = args
+            .get("content")
             .and_then(|v| v.as_str())
             .ok_or("Missing 'content' argument")?;
-        let token = args.get("token")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let tags: Vec<String> = args.get("tags")
+        let token = args.get("token").and_then(|v| v.as_str()).unwrap_or("");
+        let tags: Vec<String> = args
+            .get("tags")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
 
-        match self.provider.update_data(token, id, content.as_bytes().to_vec(), tags).await {
+        match self
+            .provider
+            .update_data(token, id, content.as_bytes().to_vec(), tags)
+            .await
+        {
             Ok(()) => Ok(ToolResult {
                 success: true,
                 output: serde_json::to_string_pretty(&serde_json::json!({
                     "success": true,
                     "id": id,
                     "message": "Data updated successfully"
-                })).unwrap(),
+                }))
+                .unwrap(),
                 metadata: HashMap::new(),
             }),
             Err(e) => Ok(ToolResult {
@@ -314,7 +357,8 @@ impl ToolExecutor for UpdateDataTool {
                 output: serde_json::to_string_pretty(&serde_json::json!({
                     "success": false,
                     "error": e
-                })).unwrap(),
+                }))
+                .unwrap(),
                 metadata: HashMap::new(),
             }),
         }
@@ -334,13 +378,15 @@ impl DeleteDataTool {
 
 #[async_trait]
 impl ToolExecutor for DeleteDataTool {
-    async fn execute(&self, args: HashMap<String, serde_json::Value>) -> Result<ToolResult, String> {
-        let id = args.get("id")
+    async fn execute(
+        &self,
+        args: HashMap<String, serde_json::Value>,
+    ) -> Result<ToolResult, String> {
+        let id = args
+            .get("id")
             .and_then(|v| v.as_str())
             .ok_or("Missing 'id' argument")?;
-        let token = args.get("token")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let token = args.get("token").and_then(|v| v.as_str()).unwrap_or("");
 
         match self.provider.delete_data(token, id).await {
             Ok(()) => Ok(ToolResult {
@@ -349,7 +395,8 @@ impl ToolExecutor for DeleteDataTool {
                     "success": true,
                     "id": id,
                     "message": "Data deleted successfully"
-                })).unwrap(),
+                }))
+                .unwrap(),
                 metadata: HashMap::new(),
             }),
             Err(e) => Ok(ToolResult {
@@ -357,7 +404,8 @@ impl ToolExecutor for DeleteDataTool {
                 output: serde_json::to_string_pretty(&serde_json::json!({
                     "success": false,
                     "error": e
-                })).unwrap(),
+                }))
+                .unwrap(),
                 metadata: HashMap::new(),
             }),
         }
@@ -377,21 +425,25 @@ impl ListDataTool {
 
 #[async_trait]
 impl ToolExecutor for ListDataTool {
-    async fn execute(&self, args: HashMap<String, serde_json::Value>) -> Result<ToolResult, String> {
-        let limit = args.get("limit")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(50) as usize;
+    async fn execute(
+        &self,
+        args: HashMap<String, serde_json::Value>,
+    ) -> Result<ToolResult, String> {
+        let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(50) as usize;
 
         let entries = self.provider.list_all_data().await;
         let truncated: Vec<_> = entries.into_iter().take(limit).collect();
-        let results: Vec<serde_json::Value> = truncated.into_iter().map(|entry| {
-            serde_json::json!({
-                "id": entry.id,
-                "type": entry.data_type,
-                "tags": entry.tags,
-                "created_at": entry.created_at,
+        let results: Vec<serde_json::Value> = truncated
+            .into_iter()
+            .map(|entry| {
+                serde_json::json!({
+                    "id": entry.id,
+                    "type": entry.data_type,
+                    "tags": entry.tags,
+                    "created_at": entry.created_at,
+                })
             })
-        }).collect();
+            .collect();
 
         Ok(ToolResult {
             success: true,
@@ -399,7 +451,8 @@ impl ToolExecutor for ListDataTool {
                 "total": results.len(),
                 "limit": limit,
                 "items": results,
-            })).unwrap(),
+            }))
+            .unwrap(),
             metadata: HashMap::new(),
         })
     }
@@ -414,7 +467,7 @@ pub fn create_default_registry() -> ToolRegistry {
 /// 创建带 DataProvider 的工具注册表
 pub fn create_registry_with_provider(provider: Arc<dyn DataProvider>) -> ToolRegistry {
     let mut registry = ToolRegistry::new();
-    
+
     // 注册搜索工具
     registry.register(
         Tool {
@@ -443,7 +496,7 @@ pub fn create_registry_with_provider(provider: Arc<dyn DataProvider>) -> ToolReg
         },
         Box::new(SearchDataTool::new(provider.clone())),
     );
-    
+
     // 注册获取工具
     registry.register(
         Tool {
@@ -467,7 +520,7 @@ pub fn create_registry_with_provider(provider: Arc<dyn DataProvider>) -> ToolReg
         },
         Box::new(GetDataTool::new(provider.clone())),
     );
-    
+
     // 注册创建工具
     registry.register(
         Tool {
@@ -593,7 +646,7 @@ mod tests {
     #[tokio::test]
     async fn test_tool_registry() {
         let registry = create_default_registry();
-        
+
         assert_eq!(registry.tool_count(), 6);
         assert!(registry.has_tool("search_data"));
         assert!(registry.has_tool("get_data"));
@@ -606,10 +659,10 @@ mod tests {
     #[tokio::test]
     async fn test_search_tool_with_null_provider() {
         let registry = create_default_registry();
-        
+
         let mut args = HashMap::new();
         args.insert("query".to_string(), serde_json::json!("github"));
-        
+
         let result = registry.execute_tool("search_data", args).await.unwrap();
         assert!(result.success);
         // NullDataProvider returns empty results
@@ -620,10 +673,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_tool_with_null_provider() {
         let registry = create_default_registry();
-        
+
         let mut args = HashMap::new();
         args.insert("id".to_string(), serde_json::json!("test-id"));
-        
+
         let result = registry.execute_tool("get_data", args).await.unwrap();
         // NullDataProvider returns error, so success should be false
         assert!(!result.success);
@@ -632,12 +685,12 @@ mod tests {
     #[tokio::test]
     async fn test_create_tool_with_null_provider() {
         let registry = create_default_registry();
-        
+
         let mut args = HashMap::new();
         args.insert("data_type".to_string(), serde_json::json!("credential"));
         args.insert("content".to_string(), serde_json::json!("secret-password"));
         args.insert("tags".to_string(), serde_json::json!(["github", "token"]));
-        
+
         let result = registry.execute_tool("create_data", args).await.unwrap();
         // NullDataProvider returns error, so success should be false
         assert!(!result.success);
@@ -647,7 +700,7 @@ mod tests {
     async fn test_tool_not_found() {
         let registry = create_default_registry();
         let args = HashMap::new();
-        
+
         let result = registry.execute_tool("nonexistent_tool", args).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("not found"));

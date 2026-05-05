@@ -7,11 +7,9 @@ use tempfile::TempDir;
 /// 辅助函数：创建临时应用实例并初始化
 async fn create_test_app() -> (synapse_service::SynapseApp, TempDir) {
     let temp_dir = TempDir::new().unwrap();
-    let mut app = synapse_service::SynapseApp::new_local(
-        temp_dir.path().to_str().unwrap(),
-    )
-    .await
-    .unwrap();
+    let mut app = synapse_service::SynapseApp::new_local(temp_dir.path().to_str().unwrap())
+        .await
+        .unwrap();
     app.init().await.unwrap();
     (app, temp_dir)
 }
@@ -70,12 +68,7 @@ async fn test_e2e_update_data() {
 
     // 存储
     let entity = app
-        .secure_store(
-            &token,
-            data_core::DataType::Config,
-            b"v1".to_vec(),
-            vec![],
-        )
+        .secure_store(&token, data_core::DataType::Config, b"v1".to_vec(), vec![])
         .await
         .unwrap();
     let id = entity.id.to_string();
@@ -272,8 +265,12 @@ async fn test_e2e_messaging() {
     let token_b = app.register("bob", "pass2").await.unwrap();
 
     // 发送消息（需要认证）
-    app.send_message(&token_a, "bob", "Greeting", "Hello Bob!").await.unwrap();
-    app.send_message(&token_b, "alice", "Reply", "Hi Alice!").await.unwrap();
+    app.send_message(&token_a, "bob", "Greeting", "Hello Bob!")
+        .await
+        .unwrap();
+    app.send_message(&token_b, "alice", "Reply", "Hi Alice!")
+        .await
+        .unwrap();
 
     // 获取消息
     let messages = app.get_messages("bob", 10);
@@ -292,9 +289,7 @@ async fn test_e2e_persistence() {
 
     // 第一个实例：存储数据
     {
-        let mut app = synapse_service::SynapseApp::new_local(path)
-            .await
-            .unwrap();
+        let mut app = synapse_service::SynapseApp::new_local(path).await.unwrap();
         app.init().await.unwrap();
         let token = app.register("persist_user", "pass123").await.unwrap();
         app.secure_store(
@@ -309,9 +304,7 @@ async fn test_e2e_persistence() {
 
     // 第二个实例：验证数据持久化
     {
-        let mut app = synapse_service::SynapseApp::new_local(path)
-            .await
-            .unwrap();
+        let mut app = synapse_service::SynapseApp::new_local(path).await.unwrap();
         app.init().await.unwrap();
 
         // 数据应已加载 - 先登录获取 token
@@ -333,24 +326,15 @@ async fn test_e2e_encryption_roundtrip() {
     let (mut app, _dir) = create_test_app().await;
     let token = app.register("crypto_user", "pass123").await.unwrap();
 
-    let original =        b"The quick brown fox jumps over the lazy dog. 1234567890 !@#$%^&*()";
+    let original = b"The quick brown fox jumps over the lazy dog. 1234567890 !@#$%^&*()";
     let entity = app
-        .secure_store(
-            &token,
-            data_core::DataType::File,
-            original.to_vec(),
-            vec![],
-        )
+        .secure_store(&token, data_core::DataType::File, original.to_vec(), vec![])
         .await
         .unwrap();
     let id = entity.id.to_string();
 
     // 存储的内容应该是加密的
-    assert_ne!(
-        entity.encrypted_content,
-        original,
-        "存储的内容应已加密"
-    );
+    assert_ne!(entity.encrypted_content, original, "存储的内容应已加密");
 
     // 解密后应与原文一致
     let (_, decrypted) = app.secure_get_decrypted(&token, &id).await.unwrap();

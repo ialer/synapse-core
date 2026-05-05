@@ -324,11 +324,7 @@ async fn list_data(
         .collect();
 
     let total = all_items.len();
-    let items: Vec<DataItemResponse> = all_items
-        .into_iter()
-        .skip(q.offset)
-        .take(q.limit)
-        .collect();
+    let items: Vec<DataItemResponse> = all_items.into_iter().skip(q.offset).take(q.limit).collect();
 
     Json(ListDataResponse {
         items,
@@ -414,7 +410,10 @@ async fn send_message(
     Json(req): Json<SendMessageRequest>,
 ) -> impl IntoResponse {
     let mut app = state.app.lock().await;
-    match app.send_message(&req.token, &req.recipient_id, &req.title, &req.content).await {
+    match app
+        .send_message(&req.token, &req.recipient_id, &req.title, &req.content)
+        .await
+    {
         Ok(_) => Json(SuccessResponse { success: true }).into_response(),
         Err(e) => error_response(StatusCode::BAD_REQUEST, &e.to_string()).into_response(),
     }
@@ -490,7 +489,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/stats", get(stats))
         .route("/api/data", post(store_data))
         .route("/api/data/list", get(list_data))
-        .route("/api/data/:id", get(get_data).put(update_data).delete(delete_data))
+        .route(
+            "/api/data/:id",
+            get(get_data).put(update_data).delete(delete_data),
+        )
         .route("/api/search", get(search))
         .route("/api/messages", post(send_message))
         .route("/api/messages/:user_id", get(get_messages));

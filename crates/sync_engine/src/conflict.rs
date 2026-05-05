@@ -1,5 +1,5 @@
 //! 冲突解决模块
-//! 
+//!
 //! 提供多种冲突解决策略。
 
 use serde::{Deserialize, Serialize};
@@ -24,10 +24,10 @@ pub enum ConflictStrategy {
 pub struct ConflictResolution {
     /// 是否使用远程数据
     pub use_remote: bool,
-    
+
     /// 合并后的数据（如果需要合并）
     pub merged_data: Option<Vec<u8>>,
-    
+
     /// 解决策略
     pub strategy: ConflictStrategy,
 }
@@ -45,7 +45,7 @@ impl ConflictResolver {
             default_strategy: strategy,
         }
     }
-    
+
     /// 解决冲突
     pub fn resolve(
         &self,
@@ -54,7 +54,7 @@ impl ConflictResolver {
         strategy: Option<ConflictStrategy>,
     ) -> ConflictResolution {
         let strategy = strategy.unwrap_or_else(|| self.default_strategy.clone());
-        
+
         match strategy {
             ConflictStrategy::LastWriterWins => {
                 let use_remote = remote_record.timestamp > local_record.timestamp;
@@ -72,13 +72,11 @@ impl ConflictResolver {
                     strategy,
                 }
             }
-            ConflictStrategy::Manual => {
-                ConflictResolution {
-                    use_remote: false,
-                    merged_data: None,
-                    strategy,
-                }
-            }
+            ConflictStrategy::Manual => ConflictResolution {
+                use_remote: false,
+                merged_data: None,
+                strategy,
+            },
             ConflictStrategy::Merge => {
                 // 简化版本：使用远程数据
                 ConflictResolution {
@@ -89,7 +87,7 @@ impl ConflictResolver {
             }
         }
     }
-    
+
     /// 批量解决冲突
     pub fn resolve_batch(
         &self,
@@ -113,11 +111,11 @@ impl ConflictDetector {
             && record1.device_id != record2.device_id
             && record1.version != record2.version
     }
-    
+
     /// 检测记录列表中的冲突
     pub fn detect_conflicts(records: &[SyncRecord]) -> Vec<(&SyncRecord, &SyncRecord)> {
         let mut conflicts = Vec::new();
-        
+
         for i in 0..records.len() {
             for j in (i + 1)..records.len() {
                 if Self::detect_conflict(&records[i], &records[j]) {
@@ -125,7 +123,7 @@ impl ConflictDetector {
                 }
             }
         }
-        
+
         conflicts
     }
 }
@@ -133,20 +131,20 @@ impl ConflictDetector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
     use crate::sync::{SyncEngine, SyncOperation};
+    use chrono::Utc;
 
     #[test]
     fn test_conflict_resolver_lww() {
         let resolver = ConflictResolver::new(ConflictStrategy::LastWriterWins);
-        
+
         let engine = SyncEngine::new("device-1");
         let local_record = engine.create_sync_record("data-1", SyncOperation::Update, 1);
-        
+
         let engine2 = SyncEngine::new("device-2");
         let mut remote_record = engine2.create_sync_record("data-1", SyncOperation::Update, 2);
         remote_record.timestamp = Utc::now() + chrono::Duration::hours(1);
-        
+
         let resolution = resolver.resolve(&local_record, &remote_record, None);
         assert!(resolution.use_remote);
     }
@@ -154,13 +152,13 @@ mod tests {
     #[test]
     fn test_conflict_resolver_version() {
         let resolver = ConflictResolver::new(ConflictStrategy::HigherVersionWins);
-        
+
         let engine = SyncEngine::new("device-1");
         let local_record = engine.create_sync_record("data-1", SyncOperation::Update, 1);
-        
+
         let engine2 = SyncEngine::new("device-2");
         let remote_record = engine2.create_sync_record("data-1", SyncOperation::Update, 2);
-        
+
         let resolution = resolver.resolve(&local_record, &remote_record, None);
         assert!(resolution.use_remote);
     }
@@ -169,12 +167,12 @@ mod tests {
     fn test_conflict_detector() {
         let engine = SyncEngine::new("device-1");
         let record1 = engine.create_sync_record("data-1", SyncOperation::Update, 1);
-        
+
         let engine2 = SyncEngine::new("device-2");
         let record2 = engine2.create_sync_record("data-1", SyncOperation::Update, 2);
-        
+
         assert!(ConflictDetector::detect_conflict(&record1, &record2));
-        
+
         let record3 = engine.create_sync_record("data-1", SyncOperation::Update, 1);
         assert!(!ConflictDetector::detect_conflict(&record1, &record3));
     }

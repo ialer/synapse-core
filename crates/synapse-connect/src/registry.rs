@@ -1,8 +1,8 @@
 //! Provider 注册表
 
+use crate::provider::{Provider, ProviderInfo};
 use std::collections::HashMap;
 use std::sync::Arc;
-use crate::provider::{Provider, ProviderInfo};
 
 /// Provider 注册表 - 管理所有已注册的 Provider
 pub struct ProviderRegistry {

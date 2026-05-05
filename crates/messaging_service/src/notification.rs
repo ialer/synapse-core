@@ -1,5 +1,5 @@
 //! 通知管理模块
-//! 
+//!
 //! 管理通知的发送和接收。
 
 use chrono::{DateTime, Utc};
@@ -27,22 +27,22 @@ pub enum NotificationType {
 pub struct Notification {
     /// 通知 ID
     pub id: String,
-    
+
     /// 通知类型
     pub notification_type: NotificationType,
-    
+
     /// 标题
     pub title: String,
-    
+
     /// 内容
     pub content: String,
-    
+
     /// 创建时间
     pub created_at: DateTime<Utc>,
-    
+
     /// 是否已读
     pub is_read: bool,
-    
+
     /// 元数据
     pub metadata: std::collections::HashMap<String, String>,
 }
@@ -64,7 +64,7 @@ impl Notification {
             metadata: std::collections::HashMap::new(),
         }
     }
-    
+
     /// 标记为已读
     pub fn mark_as_read(&mut self) {
         self.is_read = true;
@@ -84,40 +84,41 @@ impl NotificationManager {
             notifications: Vec::new(),
         }
     }
-    
+
     /// 添加通知
     pub fn add_notification(&mut self, notification: Notification) {
         self.notifications.push(notification);
     }
-    
+
     /// 获取未读通知
     pub fn get_unread(&self) -> Vec<&Notification> {
-        self.notifications
-            .iter()
-            .filter(|n| !n.is_read)
-            .collect()
+        self.notifications.iter().filter(|n| !n.is_read).collect()
     }
-    
+
     /// 获取通知数量
     pub fn count(&self) -> usize {
         self.notifications.len()
     }
-    
+
     /// 获取未读数量
     pub fn unread_count(&self) -> usize {
         self.notifications.iter().filter(|n| !n.is_read).count()
     }
-    
+
     /// 标记通知为已读
     pub fn mark_as_read(&mut self, notification_id: &str) -> bool {
-        if let Some(notification) = self.notifications.iter_mut().find(|n| n.id == notification_id) {
+        if let Some(notification) = self
+            .notifications
+            .iter_mut()
+            .find(|n| n.id == notification_id)
+        {
             notification.mark_as_read();
             true
         } else {
             false
         }
     }
-    
+
     /// 清除已读通知
     pub fn clear_read(&mut self) {
         self.notifications.retain(|n| !n.is_read);
@@ -136,28 +137,20 @@ mod tests {
 
     #[test]
     fn test_notification_creation() {
-        let notification = Notification::new(
-            NotificationType::DataUpdate,
-            "Test",
-            "Hello",
-        );
+        let notification = Notification::new(NotificationType::DataUpdate, "Test", "Hello");
         assert!(!notification.is_read);
     }
 
     #[test]
     fn test_notification_manager() {
         let mut manager = NotificationManager::new();
-        
-        let notification = Notification::new(
-            NotificationType::DataUpdate,
-            "Test",
-            "Hello",
-        );
+
+        let notification = Notification::new(NotificationType::DataUpdate, "Test", "Hello");
         manager.add_notification(notification);
-        
+
         assert_eq!(manager.count(), 1);
         assert_eq!(manager.unread_count(), 1);
-        
+
         let unread = manager.get_unread();
         assert_eq!(unread.len(), 1);
     }

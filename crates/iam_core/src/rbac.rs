@@ -1,13 +1,12 @@
 //! RBAC 角色与权限模块
-//! 
+//!
 //! 定义基于角色的访问控制模型。
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// 角色枚举
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum Role {
     /// 管理员 - 拥有所有权限
     Admin,
@@ -27,7 +26,7 @@ impl Role {
             Role::Guest => "guest",
         }
     }
-    
+
     /// 从字符串解析角色
     pub fn parse_role(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
@@ -37,7 +36,7 @@ impl Role {
             _ => None,
         }
     }
-    
+
     /// 获取角色的权限列表
     pub fn permissions(&self) -> Vec<Permission> {
         match self {
@@ -47,16 +46,11 @@ impl Role {
                 Permission::Delete,
                 Permission::Admin,
             ],
-            Role::User => vec![
-                Permission::Read,
-                Permission::Write,
-            ],
-            Role::Guest => vec![
-                Permission::Read,
-            ],
+            Role::User => vec![Permission::Read, Permission::Write],
+            Role::Guest => vec![Permission::Read],
         }
     }
-    
+
     /// 获取角色的层级（数字越大权限越高）
     pub fn level(&self) -> u8 {
         match self {
@@ -72,7 +66,6 @@ impl fmt::Display for Role {
         write!(f, "{}", self.as_str())
     }
 }
-
 
 /// 权限枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -97,7 +90,7 @@ impl Permission {
             Permission::Admin => "admin",
         }
     }
-    
+
     /// 从字符串解析权限
     pub fn parse_permission(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
@@ -108,7 +101,7 @@ impl Permission {
             _ => None,
         }
     }
-    
+
     /// 获取权限的层级
     pub fn level(&self) -> u8 {
         match self {
@@ -131,13 +124,13 @@ impl fmt::Display for Permission {
 pub struct UserRole {
     /// 用户 ID
     pub user_id: String,
-    
+
     /// 角色
     pub role: Role,
-    
+
     /// 额外权限（超出角色默认权限）
     pub extra_permissions: Vec<Permission>,
-    
+
     /// 分配时间
     pub assigned_at: chrono::DateTime<chrono::Utc>,
 }
@@ -152,7 +145,7 @@ impl UserRole {
             assigned_at: chrono::Utc::now(),
         }
     }
-    
+
     /// 添加额外权限
     pub fn with_permission(mut self, permission: Permission) -> Self {
         if !self.extra_permissions.contains(&permission) {
@@ -160,18 +153,18 @@ impl UserRole {
         }
         self
     }
-    
+
     /// 检查是否拥有指定权限
     pub fn has_permission(&self, permission: &Permission) -> bool {
         // 检查角色默认权限
         if self.role.permissions().contains(permission) {
             return true;
         }
-        
+
         // 检查额外权限
         self.extra_permissions.contains(permission)
     }
-    
+
     /// 获取所有权限（角色权限 + 额外权限）
     pub fn all_permissions(&self) -> Vec<Permission> {
         let mut permissions = self.role.permissions();
@@ -192,12 +185,12 @@ impl PermissionChecker {
     pub fn check_permission(user_role: &UserRole, required: &Permission) -> bool {
         user_role.has_permission(required)
     }
-    
+
     /// 检查用户是否拥有所需角色
     pub fn check_role(user_role: &UserRole, required: &Role) -> bool {
         user_role.role.level() >= required.level()
     }
-    
+
     /// 检查用户是否拥有所有所需权限
     pub fn check_permissions(user_role: &UserRole, required: &[Permission]) -> bool {
         required.iter().all(|p| user_role.has_permission(p))
@@ -238,16 +231,21 @@ mod tests {
 
     #[test]
     fn test_user_role_with_extra_permission() {
-        let user_role = UserRole::new("user1", Role::User)
-            .with_permission(Permission::Delete);
+        let user_role = UserRole::new("user1", Role::User).with_permission(Permission::Delete);
         assert!(user_role.has_permission(&Permission::Delete));
     }
 
     #[test]
     fn test_permission_checker() {
         let user_role = UserRole::new("user1", Role::User);
-        assert!(PermissionChecker::check_permission(&user_role, &Permission::Read));
-        assert!(!PermissionChecker::check_permission(&user_role, &Permission::Delete));
+        assert!(PermissionChecker::check_permission(
+            &user_role,
+            &Permission::Read
+        ));
+        assert!(!PermissionChecker::check_permission(
+            &user_role,
+            &Permission::Delete
+        ));
         assert!(PermissionChecker::check_role(&user_role, &Role::Guest));
         assert!(!PermissionChecker::check_role(&user_role, &Role::Admin));
     }

@@ -1,5 +1,5 @@
 //! 元数据管理模块
-//! 
+//!
 //! 定义数据实体的元数据结构。
 
 use chrono::{DateTime, Utc};
@@ -7,31 +7,31 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// 数据元数据
-/// 
+///
 /// 包含数据的附加信息，用于索引、搜索和管理。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Metadata {
     /// 自定义键值对
     pub properties: HashMap<String, String>,
-    
+
     /// 数据来源 (设备/应用标识)
     pub source: Option<String>,
-    
+
     /// 数据大小 (字节)
     pub size: Option<u64>,
-    
+
     /// MIME 类型
     pub mime_type: Option<String>,
-    
+
     /// 最后访问时间
     pub last_accessed: Option<DateTime<Utc>>,
-    
+
     /// 访问次数
     pub access_count: u64,
-    
+
     /// 优先级 (0-100)
     pub priority: u8,
-    
+
     /// 是否收藏
     pub is_favorite: bool,
 }
@@ -178,18 +178,21 @@ mod tests {
         assert_eq!(metadata.size, Some(1024));
         assert_eq!(metadata.priority, 90);
         assert!(metadata.is_favorite);
-        assert_eq!(metadata.get_property("env").map(String::as_str), Some("production"));
+        assert_eq!(
+            metadata.get_property("env").map(String::as_str),
+            Some("production")
+        );
     }
 
     #[test]
     fn test_metadata_access_tracking() {
         let mut metadata = Metadata::default();
-        
+
         assert_eq!(metadata.access_count, 0);
         assert!(metadata.last_accessed.is_none());
-        
+
         metadata.record_access();
-        
+
         assert_eq!(metadata.access_count, 1);
         assert!(metadata.last_accessed.is_some());
     }
