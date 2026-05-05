@@ -184,7 +184,7 @@ async fn test_e2e_search_workflow() {
     assert_eq!(results.len(), 1, "应找到 1 条 github 相关数据");
 
     let results = app.search(&token, "token", 10).await.unwrap();
-    assert!(results.len() >= 1, "应找到 token 相关数据");
+    assert!(!results.is_empty(), "应找到 token 相关数据");
 
     // 标签搜索
     let results = app.search_by_tag("cloud", 10);
@@ -214,7 +214,7 @@ async fn test_e2e_all_data_types() {
 
     for dt in types {
         let entity = app
-            .secure_store(&token, dt.clone(), b"test_data".to_vec(), vec![])
+            .secure_store(&token, dt, b"test_data".to_vec(), vec![])
             .await
             .unwrap();
         assert!(!entity.id.to_string().is_empty());

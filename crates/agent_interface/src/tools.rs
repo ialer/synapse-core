@@ -641,7 +641,6 @@ pub fn create_registry_with_provider(provider: Arc<dyn DataProvider>) -> ToolReg
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::NullDataProvider;
 
     #[tokio::test]
     async fn test_tool_registry() {

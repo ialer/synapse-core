@@ -396,9 +396,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_processing_without_encrypt() {
-        let mut config = PipelineConfig::default();
-        config.encrypt = false;
-        config.index = false;
+        let config = PipelineConfig {
+            encrypt: false,
+            index: false,
+            ..Default::default()
+        };
         let mut pipeline = DataPipeline::new(config);
         let mut rx = pipeline.subscribe();
 
